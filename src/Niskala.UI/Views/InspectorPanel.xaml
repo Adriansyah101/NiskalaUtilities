@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Niskala.UI.Views.InspectorPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:Niskala.UI.ViewModels"
+    xmlns:views="using:Niskala.UI.Views"
+    xmlns:services="using:Niskala.UI.Services">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Grid Padding="20,18,12,14" ColumnSpacing="14" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,0,0,1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Grid Width="56" Height="56">
+        <Border CornerRadius="12" Background="{ThemeResource NiskalaPlateBrush}" />
+        <Border CornerRadius="12" Background="{x:Bind ViewModel.Item.PlateBrush, Mode=OneWay}" />
+        <TextBlock Text="{x:Bind ViewModel.Item.Initial, Mode=OneWay}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{ThemeResource NiskalaFaintBrush}" />
+        <Image Source="{x:Bind ViewModel.Item.Icon, Mode=OneWay}" Width="44" Height="44" />
+        <FontIcon Glyph="&#xE762;" FontSize="24" Foreground="{ThemeResource NiskalaAccentBrush}" Visibility="{x:Bind services:Format.Visible(ViewModel.IsBatch), Mode=OneWay}" />
+      </Grid>
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+        <TextBlock Text="{x:Bind ViewModel.Name, Mode=OneWay}" Style="{StaticResource SubtitleTextBlockStyle}" FontSize="18" TextWrapping="Wrap" MaxLines="2" />
+        <TextBlock Text="{x:Bind ViewModel.Subtitle, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+      <Button Grid.Column="2" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Command="{x:Bind ViewModel.CloseCommand}"
+              ToolTipService.ToolTip="{x:Bind ViewModel.S.Close}">
+        <FontIcon Glyph="&#xE711;" FontSize="12" />
+      </Button>
+    </Grid>
+
+    <Grid Grid.Row="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+      <InfoBar Margin="20,12,20,0" Severity="Error" IsClosable="True" Message="{x:Bind ViewModel.Error, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Error), Mode=OneWay}" />
+
+      <ScrollViewer Grid.Row="1" Padding="20,16,20,20" Visibility="{x:Bind services:Format.Visible(ViewModel.IsDetails), Mode=OneWay}">
+        <StackPanel Spacing="16">
+          <InfoBar Severity="Warning" IsClosable="False" Message="{x:Bind ViewModel.Notice, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Notice), Mode=OneWay}" />
+          <ItemsControl ItemsSource="{x:Bind ViewModel.Facts, Mode=OneWay}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <Border Style="{StaticResource PillStyle}">
+                  <TextBlock Text="{x:Bind}" Style="{StaticResource CaptionMutedStyle}" />
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <StackPanel Spacing="4">
+            <TextBlock Text="{x:Bind ViewModel.S.LabelLocation}" Style="{StaticResource SectionLabelStyle}" />
+            <TextBlock Text="{x:Bind ViewModel.Location, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" />
+            <HyperlinkButton Padding="0,2" Content="{x:Bind ViewModel.S.OpenFolder}" Command="{x:Bind ViewModel.OpenFolderCommand}"
+                             Visibility="{x:Bind services:Format.Visible(ViewModel.HasLocation), Mode=OneWay}" />
+          </StackPanel>
+          <Grid ColumnSpacing="24">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+              <TextBlock Text="{x:Bind ViewModel.S.LabelSize}" Style="{StaticResource SectionLabelStyle}" />
+              <TextBlock Text="{x:Bind ViewModel.Item.SizeText, Mode=OneWay}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock Text="{x:Bind ViewModel.S.LabelInstalled}" Style="{StaticResource SectionLabelStyle}" />
+              <TextBlock Text="{x:Bind ViewModel.Installed, Mode=OneWay}" />
+            </StackPanel>
+          </Grid>
+          <StackPanel Spacing="4">
+            <TextBlock Text="{x:Bind ViewModel.S.LabelCommand}" Style="{StaticResource SectionLabelStyle}" />
+            <TextBlock Text="{x:Bind ViewModel.Command, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" />
+          </StackPanel>
+          <StackPanel Spacing="4" Visibility="{x:Bind services:Format.Visible(ViewModel.HasWebsite), Mode=OneWay}">
+            <TextBlock Text="{x:Bind ViewModel.S.LabelWebsite}" Style="{StaticResource SectionLabelStyle}" />
+            <HyperlinkButton Padding="0,2" Content="{x:Bind ViewModel.Website, Mode=OneWay}" Command="{x:Bind ViewModel.OpenWebsiteCommand}" />
+          </StackPanel>
+
+          <Border Style="{StaticResource CardStyle}" Padding="14,6">
+            <StackPanel>
+              <ToggleSwitch Header="{x:Bind ViewModel.S.Silent}" IsOn="{x:Bind ViewModel.Silent, Mode=TwoWay}" />
+              <TextBlock Text="{x:Bind ViewModel.S.SilentHint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" Margin="0,-4,0,8" />
+              <ToggleSwitch Header="{x:Bind ViewModel.S.RestorePointToggle}" IsOn="{x:Bind ViewModel.RestorePoint, Mode=TwoWay}" />
+            </StackPanel>
+          </Border>
+
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.S.Uninstall}" Command="{x:Bind ViewModel.UninstallCommand}" MinWidth="120" />
+            <Button Content="{x:Bind ViewModel.S.Force}" Command="{x:Bind ViewModel.ForceCommand}" MinWidth="120" />
+          </StackPanel>
+          <TextBlock Text="{x:Bind ViewModel.S.ForceHint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <Grid Grid.Row="1" Visibility="{x:Bind services:Format.Visible(ViewModel.IsFlow), Mode=OneWay}">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ItemsControl Padding="20,12,20,0" ItemsSource="{x:Bind ViewModel.Steps}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="6" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TimelineStep">
+              <StackPanel Orientation="Horizontal" Spacing="6" ToolTipService.ToolTip="{x:Bind Detail, Mode=OneWay}">
+                <Grid Width="20" Height="20" VerticalAlignment="Center">
+                  <Ellipse Stroke="{ThemeResource NiskalaStrokeBrush}" StrokeThickness="2" Visibility="{x:Bind services:Format.Visible(IsPending), Mode=OneWay}" />
+                  <ProgressRing Width="18" Height="18" IsActive="{x:Bind IsActive, Mode=OneWay}" Visibility="{x:Bind services:Format.Visible(IsActive), Mode=OneWay}" />
+                  <Grid Visibility="{x:Bind services:Format.Visible(IsDone), Mode=OneWay}">
+                    <Ellipse Fill="{ThemeResource NiskalaSuccessBrush}" />
+                    <FontIcon Glyph="&#xE73E;" FontSize="10" Foreground="{ThemeResource NiskalaBackgroundBrush}" />
+                  </Grid>
+                  <Grid Visibility="{x:Bind services:Format.Visible(IsFailed), Mode=OneWay}">
+                    <Ellipse Fill="{ThemeResource NiskalaDangerBrush}" />
+                    <FontIcon Glyph="&#xE711;" FontSize="9" Foreground="{ThemeResource NiskalaBackgroundBrush}" />
+                  </Grid>
+                  <Grid Visibility="{x:Bind services:Format.Visible(IsSkipped), Mode=OneWay}">
+                    <Ellipse Fill="{ThemeResource NiskalaFaintBrush}" />
+                    <FontIcon Glyph="&#xE738;" FontSize="9" Foreground="{ThemeResource NiskalaBackgroundBrush}" />
+                  </Grid>
+                </Grid>
+                <TextBlock Text="{x:Bind Title}" Style="{StaticResource CaptionTextBlockStyle}" FontWeight="SemiBold" VerticalAlignment="Center" MaxLines="1" />
+                <Rectangle Width="24" Height="1" Margin="4,0" VerticalAlignment="Center" Fill="{ThemeResource NiskalaStrokeBrush}" Visibility="{x:Bind services:Format.Visible(HasLine)}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel Grid.Row="1" Padding="20,12,20,10" Spacing="6">
+          <ProgressBar Maximum="1" Value="{x:Bind ViewModel.Progress, Mode=OneWay}" IsIndeterminate="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+          <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{x:Bind ViewModel.Phase, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" MaxLines="1"
+                       ToolTipService.ToolTip="{x:Bind ViewModel.Phase, Mode=OneWay}" />
+            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.Metrics, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+
+        <Grid Grid.Row="2" Padding="20,0,20,12" RowSpacing="12" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowLog), Mode=OneWay}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <Border Style="{StaticResource CardStyle}" BorderBrush="{ThemeResource NiskalaAccentBrush}" MaxHeight="300"
+                  Visibility="{x:Bind services:Format.Visible(ViewModel.AwaitingStart), Mode=OneWay}">
+            <Grid RowSpacing="10">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <TextBlock Text="{x:Bind ViewModel.StartTitle, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+              <ScrollViewer Grid.Row="1">
+                <TextBlock Text="{x:Bind ViewModel.StartText, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" />
+              </ScrollViewer>
+              <StackPanel Grid.Row="2" Spacing="4" Visibility="{x:Bind services:Format.Visible(ViewModel.IsSteam), Mode=OneWay}">
+                <RadioButtons ItemsSource="{x:Bind ViewModel.SteamChoices, Mode=OneWay}" SelectedIndex="{x:Bind ViewModel.SteamChoice, Mode=TwoWay}" />
+                <CheckBox Content="{x:Bind ViewModel.S.SteamPermanent}" IsChecked="{x:Bind ViewModel.SteamPermanent, Mode=TwoWay}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="4">
+            <ListView x:Name="ActivityList" ItemsSource="{x:Bind ViewModel.Activity}" SelectionMode="None" IsItemClickEnabled="False">
+              <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                  <Setter Property="MinHeight" Value="28" />
+                  <Setter Property="Padding" Value="10,0" />
+                </Style>
+              </ListView.ItemContainerStyle>
+              <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:ActivityRow">
+                  <Grid ColumnSpacing="10" Padding="0,3">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{x:Bind TimeText}" Style="{StaticResource MonoTextStyle}" Foreground="{ThemeResource NiskalaFaintBrush}" VerticalAlignment="Top" />
+                    <Grid Grid.Column="1" Width="14" VerticalAlignment="Top" Margin="0,2,0,0">
+                      <FontIcon Glyph="{x:Bind Glyph}" FontSize="12" Foreground="{ThemeResource NiskalaSuccessBrush}" Visibility="{x:Bind services:Format.Visible(IsSuccess)}" />
+                      <FontIcon Glyph="{x:Bind Glyph}" FontSize="12" Foreground="{ThemeResource NiskalaWarningBrush}" Visibility="{x:Bind services:Format.Visible(IsWarning)}" />
+                      <FontIcon Glyph="{x:Bind Glyph}" FontSize="12" Foreground="{ThemeResource NiskalaDangerBrush}" Visibility="{x:Bind services:Format.Visible(IsFailure)}" />
+                      <FontIcon Glyph="{x:Bind Glyph}" FontSize="12" Foreground="{ThemeResource NiskalaMutedBrush}" Visibility="{x:Bind services:Format.Visible(IsPlain)}" />
+                    </Grid>
+                    <TextBlock Grid.Column="2" Text="{x:Bind Text}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                  </Grid>
+                </DataTemplate>
+              </ListView.ItemTemplate>
+            </ListView>
+          </Border>
+        </Grid>
+
+        <views:LeftoverReviewView Grid.Row="2" Margin="20,0,20,12" ViewModel="{x:Bind ViewModel.Review}"
+                                  Visibility="{x:Bind services:Format.Visible(ViewModel.ShowReview), Mode=OneWay}" />
+
+        <Grid Grid.Row="3" Padding="20,12" ColumnSpacing="10" Background="{ThemeResource NiskalaSurfaceRaisedBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,1,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel VerticalAlignment="Center">
+            <StackPanel Visibility="{x:Bind services:Format.Visible(ViewModel.ShowReview), Mode=OneWay}">
+              <TextBlock Text="{x:Bind ViewModel.Review.CheckedText, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+              <CheckBox Content="{x:Bind ViewModel.S.Permanent}" IsChecked="{x:Bind ViewModel.Review.Permanent, Mode=TwoWay}" />
+            </StackPanel>
+            <TextBlock Text="{x:Bind ViewModel.S.StopWaitingHint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
+                       Visibility="{x:Bind services:Format.Visible(ViewModel.CanStopWaiting), Mode=OneWay}" />
+            <TextBlock Text="{x:Bind ViewModel.Result, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap"
+                       Visibility="{x:Bind services:Format.VisibleText(ViewModel.Result), Mode=OneWay}" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{x:Bind services:Format.Visible(ViewModel.AwaitingStart), Mode=OneWay}">
+              <Button Content="{x:Bind ViewModel.S.Cancel}" Command="{x:Bind ViewModel.CancelStartCommand}" MinWidth="100" />
+              <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.S.Start}" Command="{x:Bind ViewModel.StartCommand}" MinWidth="120" />
+            </StackPanel>
+            <Button Content="{x:Bind ViewModel.S.StopWaiting}" Command="{x:Bind ViewModel.StopWaitingCommand}" MinWidth="120"
+                    Visibility="{x:Bind services:Format.Visible(ViewModel.CanStopWaiting), Mode=OneWay}" />
+            <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowReview), Mode=OneWay}">
+              <Button Content="{x:Bind ViewModel.S.SkipClean}" Command="{x:Bind ViewModel.SkipCleanCommand}" MinWidth="100" />
+              <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.S.Clean}" Command="{x:Bind ViewModel.CleanCommand}" MinWidth="150" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowDone), Mode=OneWay}">
+              <Button Content="{x:Bind ViewModel.S.RemoveEmptyFolders}" Command="{x:Bind ViewModel.RemoveEmptyFoldersCommand}"
+                      Visibility="{x:Bind services:Format.VisibleCount(ViewModel.EmptyFolders.Count), Mode=OneWay}" />
+              <Button Content="{x:Bind ViewModel.S.ScanLeftovers}" Command="{x:Bind ViewModel.RescanCommand}"
+                      Visibility="{x:Bind services:Format.Visible(ViewModel.CanRescan), Mode=OneWay}" />
+              <HyperlinkButton Content="{x:Bind ViewModel.S.ShowInHistory}" Command="{x:Bind ViewModel.ShowHistoryCommand}"
+                               Visibility="{x:Bind services:Format.VisibleText(ViewModel.Result), Mode=OneWay}" />
+              <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.S.Finish}" Command="{x:Bind ViewModel.CloseFlowCommand}" MinWidth="120" />
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Grid>
+    </Grid>
+  </Grid>
+</UserControl>

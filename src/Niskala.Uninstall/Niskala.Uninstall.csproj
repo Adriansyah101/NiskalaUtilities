@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Niskala.Uninstall</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Niskala.Guardian\Niskala.Guardian.csproj" />
+    <ProjectReference Include="..\Niskala.Scanner\Niskala.Scanner.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Niskala.Uninstall.Tests" />
+  </ItemGroup>
+</Project>

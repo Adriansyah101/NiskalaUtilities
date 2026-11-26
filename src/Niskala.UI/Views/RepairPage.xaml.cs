@@ -1,0 +1,85 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Niskala.UI.Services;
+using Niskala.UI.ViewModels;
+
+namespace Niskala.UI.Views;
+
+public sealed partial class LogLineTemplates : DataTemplateSelector
+{
+    public DataTemplate? Command { get; set; }
+
+    public DataTemplate? Output { get; set; }
+
+    public DataTemplate? Error { get; set; }
+
+    protected override DataTemplate? SelectTemplateCore(object item) => (item as LogLine)?.Kind switch
+    {
+        LogLineKind.Command => Command,
+        LogLineKind.Error => Error,
+        _ => Output,
+    };
+
+    protected override DataTemplate? SelectTemplateCore(object item, DependencyObject container) => SelectTemplateCore(item);
+}
+
+public sealed partial class RepairPage : UserControl
+{
+    public RepairPage(RepairViewModel viewModel)
+    {
+        ViewModel = viewModel;
+        InitializeComponent();
+        Loaded += (_, _) =>
+        {
+            ViewModel.LineAdded += ScrollToEnd;
+            ScrollToEnd();
+        };
+        Unloaded += (_, _) => ViewModel.LineAdded -= ScrollToEnd;
+    }
+
+    public RepairViewModel ViewModel { get; }
+
+    private void ScrollToEnd()
+    {
+        if (ViewModel.Lines.Count > 0)
+        {
+            Log.ScrollIntoView(ViewModel.Lines[^1]);
+        }
+    }
+
+    private void OnRun(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.Selected is not { } row)
+        {
+            return;
+        }
+
+        if (!row.Command.ChangesSystem)
+        {
+            ViewModel.RunCommand.Execute(null);
+            return;
+        }
+
+        var confirm = new Button { Content = Strings.Current.RepairRun, Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
+        var flyout = new Flyout
+        {
+            Content = new StackPanel
+            {
+                Width = 320,
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = Strings.Current.RepairConfirm(row.Name, row.CommandLine, row.Command.NeedsRestart), TextWrapping = TextWrapping.Wrap },
+                    confirm,
+                },
+            },
+        };
+        confirm.Click += (_, _) =>
+        {
+            flyout.Hide();
+            ViewModel.RunCommand.Execute(null);
+        };
+        flyout.ShowAt(RunButton, new FlyoutShowOptions { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight });
+    }
+}

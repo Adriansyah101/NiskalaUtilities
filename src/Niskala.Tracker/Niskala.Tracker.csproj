@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Niskala.Tracker</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Niskala.Guardian\Niskala.Guardian.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <EtwHelperDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\native\Niskala.EtwHelper'))\</EtwHelperDirectory>
+    <EtwHelperPlatform Condition="'$(RuntimeIdentifier)' == 'win-arm64'">ARM64</EtwHelperPlatform>
+    <EtwHelperPlatform Condition="'$(EtwHelperPlatform)' == ''">x64</EtwHelperPlatform>
+    <EtwHelperConfiguration Condition="'$(Configuration)' == 'Debug'">Debug</EtwHelperConfiguration>
+    <EtwHelperConfiguration Condition="'$(EtwHelperConfiguration)' == ''">Release</EtwHelperConfiguration>
+    <EtwHelperDll>$(EtwHelperDirectory)bin\$(EtwHelperPlatform)\$(EtwHelperConfiguration)\Niskala.EtwHelper.dll</EtwHelperDll>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EtwHelperSource Include="$(EtwHelperDirectory)**\*.cpp;$(EtwHelperDirectory)**\*.h;$(EtwHelperDirectory)Niskala.EtwHelper.vcxproj" Exclude="$(EtwHelperDirectory)bin\**;$(EtwHelperDirectory)obj\**" />
+    <None Include="$(EtwHelperDll)" Link="Niskala.EtwHelper.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="BuildEtwHelper" BeforeTargets="BeforeBuild" Inputs="@(EtwHelperSource)" Outputs="$(EtwHelperDll)">
+    <Exec Command="&quot;$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe&quot; -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find MSBuild\**\Bin\MSBuild.exe"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="VsMSBuild" />
+    </Exec>
+    <Error Condition="'$(VsMSBuild)' == '' Or !Exists('$(VsMSBuild)')" Text="Niskala.EtwHelper needs the Visual Studio 2022 C++ build tools (MSVC v143)." />
+    <Exec Command="&quot;$(VsMSBuild)&quot; &quot;$(EtwHelperDirectory)Niskala.EtwHelper.vcxproj&quot; -nologo -v:minimal -nodeReuse:false -p:Configuration=$(EtwHelperConfiguration) -p:Platform=$(EtwHelperPlatform)"
+          EnvironmentVariables="MSBuildExtensionsPath=;MSBuildSDKsPath=;MSBUILD_EXE_PATH=" />
+  </Target>
+</Project>

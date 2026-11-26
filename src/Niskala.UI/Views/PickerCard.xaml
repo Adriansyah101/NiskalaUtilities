@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Niskala.UI.Views.PickerCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Niskala Utilities">
+  <Grid x:Name="Root" Background="{ThemeResource NiskalaSurfaceBrush}" BorderBrush="{ThemeResource NiskalaAccentBrush}" BorderThickness="1" Padding="16,12" ColumnSpacing="14" RowSpacing="10">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Border Width="40" Height="40" CornerRadius="20" Background="{ThemeResource NiskalaAccentSoftBrush}" VerticalAlignment="Center">
+      <FontIcon Glyph="&#xE81D;" FontSize="18" Foreground="{ThemeResource NiskalaAccentBrush}" />
+    </Border>
+    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+      <TextBlock Text="{x:Bind ViewModel.PreviewTitle, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+      <TextBlock Text="{x:Bind ViewModel.PreviewDetail, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+      <TextBlock Text="{x:Bind ViewModel.S.PickerHint}" Style="{StaticResource CaptionMutedStyle}" Foreground="{ThemeResource NiskalaFaintBrush}" />
+    </StackPanel>
+    <Button Grid.Row="1" Grid.Column="1" Command="{x:Bind ViewModel.BrowseCommand}" HorizontalAlignment="Left">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <FontIcon Glyph="&#xE8E5;" FontSize="14" />
+        <TextBlock Text="{x:Bind ViewModel.S.PickerBrowse}" />
+      </StackPanel>
+    </Button>
+  </Grid>
+</Window>

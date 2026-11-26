@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Niskala.Host</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Niskala.Uninstall\Niskala.Uninstall.csproj" />
+    <ProjectReference Include="..\Niskala.Tracker\Niskala.Tracker.csproj" />
+    <ProjectReference Include="..\Niskala.Repair\Niskala.Repair.csproj" />
+    <ProjectReference Include="..\Niskala.Cleaner\Niskala.Cleaner.csproj" />
+    <ProjectReference Include="..\Niskala.Optimizer\Niskala.Optimizer.csproj" />
+    <ProjectReference Include="..\Niskala.Toolkit\Niskala.Toolkit.csproj" />
+  </ItemGroup>
+</Project>

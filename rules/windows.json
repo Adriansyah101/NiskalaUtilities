@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "windows.user-temp",
+      "category": "temporaryFiles",
+      "name": { "en": "Temporary files of this user", "id": "Berkas sementara pengguna ini" },
+      "description": { "en": "Files in %TEMP% untouched for a day; files still open are left alone.", "id": "Berkas di %TEMP% yang tidak disentuh sehari; berkas yang masih terbuka dibiarkan." },
+      "quick": true,
+      "removal": "permanent",
+      "minimumAgeHours": 24,
+      "targets": [
+        { "root": "userTemp", "recurse": true }
+      ]
+    },
+    {
+      "id": "windows.system-temp",
+      "category": "temporaryFiles",
+      "name": { "en": "Windows temporary files", "id": "Berkas sementara Windows" },
+      "description": { "en": "Files in the Windows Temp folder untouched for a day.", "id": "Berkas di folder Temp Windows yang tidak disentuh sehari." },
+      "quick": true,
+      "removal": "permanent",
+      "requiresElevation": true,
+      "minimumAgeHours": 24,
+      "targets": [
+        { "root": "windowsTemp", "recurse": true }
+      ]
+    },
+    {
+      "id": "windows.thumbnail-cache",
+      "category": "thumbnailCache",
+      "name": { "en": "Thumbnail and icon caches", "id": "Cache thumbnail dan ikon" },
+      "description": { "en": "Explorer rebuilds them on demand; the ones Explorer holds open stay until the next sign-in.", "id": "Explorer membangunnya ulang bila perlu; yang sedang dibuka Explorer tetap ada sampai masuk berikutnya." },
+      "quick": true,
+      "removal": "permanent",
+      "targets": [
+        { "root": "localAppData", "path": "Microsoft\\Windows\\Explorer", "files": ["thumbcache_*.db", "iconcache_*.db"] }
+      ]
+    },
+    {
+      "id": "windows.shell-web-cache",
+      "category": "temporaryFiles",
+      "name": { "en": "Shell web cache", "id": "Cache web shell" },
+      "description": { "en": "INetCache files used by embedded web views and Office, untouched for a day.", "id": "Berkas INetCache yang dipakai web view tertanam dan Office, tidak disentuh sehari." },
+      "quick": true,
+      "removal": "permanent",
+      "minimumAgeHours": 24,
+      "targets": [
+        { "root": "localAppData", "path": "Microsoft\\Windows\\INetCache", "recurse": true, "exclude": ["desktop.ini", "container.dat"] }
+      ]
+    },
+    {
+      "id": "windows.crash-dumps",
+      "category": "crashDumps",
+      "name": { "en": "Program crash dumps", "id": "Dump crash program" },
+      "description": { "en": "Memory dumps that crashed programs left in this profile.", "id": "Dump memori yang ditinggalkan program yang crash di profil ini." },
+      "quick": true,
+      "removal": "permanent",
+      "targets": [
+        { "root": "localAppData", "path": "CrashDumps", "files": ["*.dmp"], "recurse": true }
+      ]
+    },
+    {
+      "id": "windows.kernel-dumps",
+      "category": "crashDumps",
+      "name": { "en": "Windows crash dumps", "id": "Dump crash Windows" },
+      "description": { "en": "Small memory dumps from system crashes.", "id": "Dump memori kecil dari crash sistem." },
+      "removal": "permanent",
+      "requiresElevation": true,
+      "targets": [
+        { "root": "windows", "path": "Minidump", "files": ["*.dmp"] }
+      ]
+    },
+    {
+      "id": "windows.error-reports",
+      "category": "errorReports",
+      "name": { "en": "Error reports of this user", "id": "Laporan galat pengguna ini" },
+      "description": { "en": "Archived and queued Windows Error Reporting files.", "id": "Berkas Windows Error Reporting yang diarsipkan dan mengantre." },
+      "quick": true,
+      "removal": "permanent",
+      "targets": [
+        { "root": "localAppData", "path": "Microsoft\\Windows\\WER\\ReportArchive", "recurse": true },
+        { "root": "localAppData", "path": "Microsoft\\Windows\\WER\\ReportQueue", "recurse": true }
+      ]
+    },
+    {
+      "id": "windows.system-error-reports",
+      "category": "errorReports",
+      "name": { "en": "System error reports", "id": "Laporan galat sistem" },
+      "description": { "en": "Archived, queued and scratch Windows Error Reporting files for all users.", "id": "Berkas Windows Error Reporting yang diarsipkan, mengantre, dan sementara untuk semua pengguna." },
+      "quick": true,
+      "removal": "permanent",
+      "requiresElevation": true,
+      "targets": [
+        { "root": "programData", "path": "Microsoft\\Windows\\WER\\ReportArchive", "recurse": true },
+        { "root": "programData", "path": "Microsoft\\Windows\\WER\\ReportQueue", "recurse": true },
+        { "root": "programData", "path": "Microsoft\\Windows\\WER\\Temp", "recurse": true }
+      ]
+    },
+    {
+      "id": "windows.delivery-optimization",
+      "category": "deliveryOptimization",
+      "name": { "en": "Delivery Optimization cache", "id": "Cache Delivery Optimization" },
+      "description": { "en": "Update pieces Windows kept to share with other PCs; files the service has open are left alone.", "id": "Potongan pembaruan yang disimpan Windows untuk dibagikan ke PC lain; berkas yang dibuka layanannya dibiarkan." },
+      "quick": true,
+      "removal": "permanent",
+      "requiresElevation": true,
+      "targets": [
+        { "root": "windows", "path": "ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Windows\\DeliveryOptimization\\Cache", "recurse": true }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Extensions.Logging;
+using Niskala.Core.Models;
+using Niskala.Interop.Icons;
+
+namespace Niskala.Scanner.Icons;
+
+public sealed class IconCache(IconExtractor extractor, IconSourceResolver resolver, string directory, ILogger<IconCache> logger)
+{
+    public const int Size = 256;
+
+    private const int KeyBytes = 16;
+
+    public static string DefaultDirectory =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Niskala", "icons");
+
+    public async Task<string?> GetAsync(InstalledApp app, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        if (resolver.Resolve(app) is not { } source)
+        {
+            return null;
+        }
+
+        string file = Path.Combine(directory, FileName(source));
+        if (File.Exists(file))
+        {
+            return file;
+        }
+
+        string temp = $"{file}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            Directory.CreateDirectory(directory);
+            if (source.Kind == IconSourceKind.Image)
+            {
+                File.Copy(source.Path, temp, overwrite: true);
+            }
+            else
+            {
+                IconPixels? pixels = await extractor.ExtractAsync(source, Size, cancellationToken).ConfigureAwait(false);
+                if (pixels is null)
+                {
+                    ScannerLog.IconNotFound(logger, app.Id, source.Path, source.Index);
+                    return null;
+                }
+
+                using (FileStream stream = File.Create(temp))
+                {
+                    PngEncoder.Write(stream, pixels);
+                }
+            }
+
+            try
+            {
+                File.Move(temp, file, overwrite: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && File.Exists(file))
+            {
+                ScannerLog.IconKeptExisting(logger, app.Id, ex);
+            }
+
+            return file;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ScannerLog.IconWriteFailed(logger, app.Id, ex);
+            return null;
+        }
+        finally
+        {
+            File.Delete(temp);
+        }
+    }
+
+    public int Prune(IEnumerable<InstalledApp> apps)
+    {
+        ArgumentNullException.ThrowIfNull(apps);
+        var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (InstalledApp app in apps)
+        {
+            if (resolver.Resolve(app) is { } source)
+            {
+                keep.Add(FileName(source));
+            }
+        }
+
+        if (!Directory.Exists(directory))
+        {
+            return 0;
+        }
+
+        int deleted = 0;
+        foreach (string file in Directory.EnumerateFiles(directory, "*.png"))
+        {
+            string name = Path.GetFileName(file);
+            if (!IsCacheFileName(name) || keep.Contains(name))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+                deleted++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                ScannerLog.IconDeleteFailed(logger, name, ex);
+            }
+        }
+
+        ScannerLog.IconsPruned(logger, deleted, keep.Count);
+        return deleted;
+    }
+
+    internal static bool IsCacheFileName(string name) =>
+        name.Length == (KeyBytes * 2) + 4
+        && name.EndsWith(".png", StringComparison.Ordinal)
+        && name.AsSpan(0, KeyBytes * 2).IndexOfAnyExcept("0123456789abcdef") < 0;
+
+    private static string FileName(IconSource source)
+    {
+        long written = File.GetLastWriteTimeUtc(source.Path).Ticks;
+        string identity = $"{source.Kind}|{source.Path.ToUpperInvariant()}|{source.Index}|{written}|{Size}";
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity)).AsSpan(0, KeyBytes)) + ".png";
+    }
+}

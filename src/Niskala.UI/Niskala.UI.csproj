@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Niskala.UI</RootNamespace>
+    <AssemblyName>Niskala</AssemblyName>
+    <AssemblyTitle>Niskala Utilities</AssemblyTitle>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\niskala.ico</ApplicationIcon>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <PublishAot>true</PublishAot>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <Target Name="KeepSatelliteLanguages" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Extension)' == '.mui' and !$([System.String]::new(';$(SatelliteResourceLanguages.ToUpperInvariant());').Contains(';$([System.IO.Path]::GetDirectoryName(%(RelativePath)).ToUpperInvariant());'))" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <LinkerArg Include="/PDBALTPATH:%25_PDB%25" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Niskala.Core\Niskala.Core.csproj" />
+    <ProjectReference Include="..\Niskala.Scanner\Niskala.Scanner.csproj" />
+    <ProjectReference Include="..\Niskala.Uninstall\Niskala.Uninstall.csproj" />
+    <ProjectReference Include="..\Niskala.Guardian\Niskala.Guardian.csproj" />
+    <ProjectReference Include="..\Niskala.Tracker\Niskala.Tracker.csproj" />
+    <ProjectReference Include="..\Niskala.Host\Niskala.Host.csproj" />
+  </ItemGroup>
+</Project>

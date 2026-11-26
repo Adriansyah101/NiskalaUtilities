@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "browsers": [
+    { "id": "edge", "name": "Microsoft Edge", "engine": "chromium", "processes": ["msedge"], "userData": [{ "root": "localAppData", "path": "Microsoft\\Edge\\User Data" }] },
+    { "id": "chrome", "name": "Google Chrome", "engine": "chromium", "processes": ["chrome"], "userData": [{ "root": "localAppData", "path": "Google\\Chrome\\User Data" }] },
+    { "id": "brave", "name": "Brave", "engine": "chromium", "processes": ["brave"], "userData": [{ "root": "localAppData", "path": "BraveSoftware\\Brave-Browser\\User Data" }] },
+    { "id": "vivaldi", "name": "Vivaldi", "engine": "chromium", "processes": ["vivaldi"], "userData": [{ "root": "localAppData", "path": "Vivaldi\\User Data" }] },
+    {
+      "id": "opera", "name": "Opera", "engine": "chromium", "processes": ["opera"],
+      "userData": [{ "root": "roamingAppData", "path": "Opera Software\\Opera Stable" }],
+      "cacheData": [{ "root": "localAppData", "path": "Opera Software\\Opera Stable" }]
+    },
+    {
+      "id": "opera-gx", "name": "Opera GX", "engine": "chromium", "processes": ["opera"],
+      "userData": [{ "root": "roamingAppData", "path": "Opera Software\\Opera GX Stable" }],
+      "cacheData": [{ "root": "localAppData", "path": "Opera Software\\Opera GX Stable" }]
+    },
+    {
+      "id": "firefox", "name": "Mozilla Firefox", "engine": "gecko", "processes": ["firefox"],
+      "userData": [{ "root": "roamingAppData", "path": "Mozilla\\Firefox\\Profiles" }],
+      "cacheData": [{ "root": "localAppData", "path": "Mozilla\\Firefox\\Profiles" }]
+    },
+    {
+      "id": "librewolf", "name": "LibreWolf", "engine": "gecko", "processes": ["librewolf"],
+      "userData": [{ "root": "roamingAppData", "path": "librewolf\\Profiles" }],
+      "cacheData": [{ "root": "localAppData", "path": "librewolf\\Profiles" }]
+    }
+  ],
+  "engines": [
+    {
+      "engine": "chromium",
+      "profileMarker": "Preferences",
+      "items": [
+        {
+          "id": "cache",
+          "category": "browserCache",
+          "name": { "en": "Cache", "id": "Cache" },
+          "description": { "en": "Page, code, GPU and service-worker caches; pages load them again when needed.", "id": "Cache halaman, kode, GPU, dan service worker; halaman memuatnya lagi bila perlu." },
+          "quick": true,
+          "removal": "permanent",
+          "area": "cache",
+          "targets": [
+            { "path": "Cache", "recurse": true },
+            { "path": "Code Cache", "recurse": true },
+            { "path": "GPUCache", "recurse": true },
+            { "path": "DawnWebGPUCache", "recurse": true },
+            { "path": "DawnGraphiteCache", "recurse": true },
+            { "path": "Service Worker\\CacheStorage", "recurse": true },
+            { "path": "Service Worker\\ScriptCache", "recurse": true }
+          ]
+        },
+        {
+          "id": "history",
+          "category": "browserHistory",
+          "name": { "en": "History", "id": "Riwayat" },
+          "description": { "en": "Visited pages, top sites and address bar shortcuts; bookmarks and passwords stay.", "id": "Halaman yang dikunjungi, situs teratas, dan pintasan bilah alamat; bookmark dan kata sandi tetap ada." },
+          "removal": "recycleBin",
+          "targets": [
+            { "files": ["History", "History-journal", "Visited Links", "Top Sites", "Top Sites-journal", "Shortcuts", "Shortcuts-journal", "Network Action Predictor", "Network Action Predictor-journal"] }
+          ]
+        },
+        {
+          "id": "cookies",
+          "category": "browserCookies",
+          "name": { "en": "Cookies", "id": "Cookie" },
+          "description": { "en": "Signs you out of sites.", "id": "Membuat Anda keluar dari situs." },
+          "removal": "recycleBin",
+          "targets": [
+            { "path": "Network", "files": ["Cookies", "Cookies-journal"] },
+            { "files": ["Cookies", "Cookies-journal"] }
+          ]
+        },
+        {
+          "id": "sessions",
+          "category": "browserSessions",
+          "name": { "en": "Open tabs and sessions", "id": "Tab terbuka dan sesi" },
+          "description": { "en": "The tabs the browser would bring back at its next start.", "id": "Tab yang akan dibuka kembali saat peramban dimulai berikutnya." },
+          "removal": "recycleBin",
+          "targets": [
+            { "path": "Sessions", "recurse": true, "keepFolders": true },
+            { "files": ["Current Session", "Current Tabs", "Last Session", "Last Tabs"] }
+          ]
+        }
+      ],
+      "databases": ["History", "Network\\Cookies", "Web Data", "Favicons", "Top Sites", "Shortcuts", "Network Action Predictor"]
+    },
+    {
+      "engine": "gecko",
+      "profileMarker": "prefs.js",
+      "items": [
+        {
+          "id": "cache",
+          "category": "browserCache",
+          "name": { "en": "Cache", "id": "Cache" },
+          "description": { "en": "Page, start-up and thumbnail caches.", "id": "Cache halaman, awal mula, dan thumbnail." },
+          "quick": true,
+          "removal": "permanent",
+          "area": "cache",
+          "targets": [
+            { "path": "cache2", "recurse": true },
+            { "path": "startupCache", "recurse": true },
+            { "path": "thumbnails", "recurse": true },
+            { "path": "jumpListCache", "recurse": true }
+          ]
+        },
+        {
+          "id": "cookies",
+          "category": "browserCookies",
+          "name": { "en": "Cookies", "id": "Cookie" },
+          "description": { "en": "Signs you out of sites.", "id": "Membuat Anda keluar dari situs." },
+          "removal": "recycleBin",
+          "targets": [
+            { "files": ["cookies.sqlite", "cookies.sqlite-wal", "cookies.sqlite-shm"] }
+          ]
+        },
+        {
+          "id": "sessions",
+          "category": "browserSessions",
+          "name": { "en": "Open tabs and sessions", "id": "Tab terbuka dan sesi" },
+          "description": { "en": "The tabs the browser would bring back at its next start.", "id": "Tab yang akan dibuka kembali saat peramban dimulai berikutnya." },
+          "removal": "recycleBin",
+          "targets": [
+            { "path": "sessionstore-backups", "recurse": true, "keepFolders": true },
+            { "files": ["sessionstore.jsonlz4"] }
+          ]
+        },
+        {
+          "id": "form-history",
+          "category": "browserForms",
+          "name": { "en": "Form history", "id": "Riwayat formulir" },
+          "description": { "en": "Words typed into web forms and search boxes.", "id": "Kata yang diketik ke formulir web dan kotak pencarian." },
+          "removal": "recycleBin",
+          "targets": [
+            { "files": ["formhistory.sqlite", "formhistory.sqlite-wal", "formhistory.sqlite-shm"] }
+          ]
+        }
+      ],
+      "databases": ["places.sqlite", "cookies.sqlite", "favicons.sqlite", "formhistory.sqlite", "content-prefs.sqlite", "permissions.sqlite", "webappsstore.sqlite"]
+    }
+  ]
+}

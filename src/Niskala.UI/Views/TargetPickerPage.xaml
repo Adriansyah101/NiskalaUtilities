@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Niskala.UI.Views.TargetPickerPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:services="using:Niskala.UI.Services">
+  <ScrollViewer>
+    <StackPanel Padding="28,4,28,24" Spacing="16" MaxWidth="900" HorizontalAlignment="Left">
+      <StackPanel>
+        <TextBlock Text="{x:Bind ViewModel.S.PickerTitle}" Style="{StaticResource PageTitleStyle}" />
+        <TextBlock Text="{x:Bind ViewModel.S.PickerSubtitle}" Style="{StaticResource CaptionMutedStyle}" />
+      </StackPanel>
+
+      <InfoBar Severity="Error" IsClosable="True" Message="{x:Bind ViewModel.Error, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Error), Mode=OneWay}" />
+      <InfoBar Severity="Success" IsClosable="True" Message="{x:Bind ViewModel.Notice, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Notice), Mode=OneWay}" />
+
+      <Border Style="{StaticResource CardStyle}" Padding="24">
+        <Grid ColumnSpacing="24">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Grid Width="96" Height="96">
+            <Ellipse Stroke="{ThemeResource NiskalaStrokeBrush}" StrokeThickness="1" />
+            <Ellipse Margin="18" Stroke="{ThemeResource NiskalaAccentBrush}" StrokeThickness="2" />
+            <Rectangle Width="1" Fill="{ThemeResource NiskalaAccentBrush}" />
+            <Rectangle Height="1" Fill="{ThemeResource NiskalaAccentBrush}" />
+            <Ellipse Width="6" Height="6" Fill="{ThemeResource NiskalaAccentBrush}" />
+          </Grid>
+          <StackPanel Grid.Column="1" Spacing="12" VerticalAlignment="Center">
+            <TextBlock Text="{x:Bind ViewModel.S.PickerInstructions}" Style="{StaticResource MutedTextStyle}" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.StartCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <FontIcon Glyph="&#xE81D;" FontSize="14" />
+                  <TextBlock Text="{x:Bind ViewModel.S.PickerStart}" />
+                </StackPanel>
+              </Button>
+              <Button Command="{x:Bind ViewModel.BrowseCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <FontIcon Glyph="&#xE8E5;" FontSize="14" />
+                  <TextBlock Text="{x:Bind ViewModel.S.PickerBrowse}" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <TextBlock Text="{x:Bind ViewModel.S.PickerResult}" Style="{StaticResource SectionLabelStyle}" />
+      <TextBlock Text="{x:Bind ViewModel.S.PickerNone}" Style="{StaticResource MutedTextStyle}" Visibility="{x:Bind services:Format.Collapsed(ViewModel.HasResult), Mode=OneWay}" />
+
+      <Border Style="{StaticResource CardStyle}" Visibility="{x:Bind services:Format.Visible(ViewModel.HasResult), Mode=OneWay}">
+        <StackPanel Spacing="14">
+          <TextBlock Text="{x:Bind ViewModel.ResultTitle, Mode=OneWay}" Style="{StaticResource SubtitleTextBlockStyle}" FontSize="18" TextWrapping="Wrap" />
+          <Grid ColumnSpacing="20" RowSpacing="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="{x:Bind ViewModel.S.LabelApp}" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.ResultApp, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+            <TextBlock Grid.Row="1" Text="{x:Bind ViewModel.S.LabelMatch}" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.ResultMatch, Mode=OneWay}" />
+            <TextBlock Grid.Row="2" Text="{x:Bind ViewModel.S.LabelImage}" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Bind ViewModel.ResultImage, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="3" Text="{x:Bind ViewModel.ResultProcessLabel, Mode=OneWay}" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{x:Bind ViewModel.ResultProcess, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="4" Text="{x:Bind ViewModel.S.LabelRunning}" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="{x:Bind ViewModel.ProcessesText, Mode=OneWay}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="5" Text="{x:Bind ViewModel.S.LabelStartup}" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="5" Grid.Column="1" Text="{x:Bind ViewModel.StartupText, Mode=OneWay}" TextWrapping="Wrap" />
+          </Grid>
+
+          <TextBlock Text="{x:Bind ViewModel.S.PickerActions}" Style="{StaticResource SectionLabelStyle}" />
+          <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="200" ItemHeight="44">
+            <Button HorizontalAlignment="Stretch" Margin="0,0,8,8" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.RemoveCommand}" IsEnabled="{x:Bind ViewModel.CanRemove, Mode=OneWay}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                <TextBlock Text="{x:Bind ViewModel.RemoveLabel, Mode=OneWay}" />
+              </StackPanel>
+            </Button>
+            <Button HorizontalAlignment="Stretch" Margin="0,0,8,8" Command="{x:Bind ViewModel.AskStopProcessesCommand}" IsEnabled="{x:Bind ViewModel.CanStopProcesses, Mode=OneWay}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE711;" FontSize="14" />
+                <TextBlock Text="{x:Bind ViewModel.S.PickerStopProcesses}" />
+              </StackPanel>
+            </Button>
+            <Button HorizontalAlignment="Stretch" Margin="0,0,8,8" Command="{x:Bind ViewModel.DisableStartupCommand}" IsEnabled="{x:Bind ViewModel.CanDisableStartup, Mode=OneWay}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE7E8;" FontSize="14" />
+                <TextBlock Text="{x:Bind ViewModel.S.PickerDisableStartup}" />
+              </StackPanel>
+            </Button>
+            <Button HorizontalAlignment="Stretch" Margin="0,0,8,8" Command="{x:Bind ViewModel.OpenLocationCommand}" IsEnabled="{x:Bind ViewModel.HasResultLocation, Mode=OneWay}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE838;" FontSize="14" />
+                <TextBlock Text="{x:Bind ViewModel.S.OpenLocation}" />
+              </StackPanel>
+            </Button>
+          </VariableSizedWrapGrid>
+
+          <Border Style="{StaticResource CardStyle}" Padding="16" Visibility="{x:Bind services:Format.Visible(ViewModel.ConfirmingStop), Mode=OneWay}">
+            <StackPanel Spacing="10">
+              <TextBlock Text="{x:Bind ViewModel.S.PickerStopConfirm}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="{x:Bind ViewModel.ProcessesText, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.S.PickerStopProcesses}" Command="{x:Bind ViewModel.StopProcessesCommand}" />
+                <Button Content="{x:Bind ViewModel.S.Cancel}" Command="{x:Bind ViewModel.CancelStopProcessesCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

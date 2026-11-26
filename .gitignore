@@ -1,0 +1,12 @@
+bin/
+obj/
+artifacts/
+publish/
+TestResults/
+*.user
+.vs/
+.vscode/
+*.zip
+*.tar
+*.log
+*.bak

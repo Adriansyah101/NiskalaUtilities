@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Niskala.Guardian</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Niskala.Scanner\Niskala.Scanner.csproj" />
+  </ItemGroup>
+</Project>
