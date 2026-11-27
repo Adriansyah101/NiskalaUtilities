@@ -38,11 +38,14 @@
       <TextBlock Text="{x:Bind ViewModel.S.RepairSubtitle}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
     </StackPanel>
 
-    <StackPanel Grid.Row="1" Spacing="8">
-      <InfoBar Severity="Error" IsClosable="True" Message="{x:Bind ViewModel.Error, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Error), Mode=OneWay}" />
-      <InfoBar Severity="Warning" IsClosable="True" Message="{x:Bind ViewModel.Warning, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Warning), Mode=OneWay}" />
-      <InfoBar Severity="Success" IsClosable="True" Message="{x:Bind ViewModel.Result, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Result), Mode=OneWay}" />
-    </StackPanel>
+    <InfoBar x:Name="StatusBar" Grid.Row="1" IsClosable="True" Closed="OnBannerClosed"
+             Severity="{x:Bind ViewModel.Banner.Severity, Mode=OneWay}" Message="{x:Bind ViewModel.Banner.Message, Mode=OneWay}"
+             IsOpen="{x:Bind ViewModel.Banner.IsOpen, Mode=OneWay}" Visibility="{x:Bind services:Format.VisibleText(ViewModel.Banner.Message), Mode=OneWay}">
+      <InfoBar.ActionButton>
+        <Button Content="{x:Bind ViewModel.S.RepairSourceRetry}" Click="OnRetryWithSource" HorizontalAlignment="Right"
+                Visibility="{x:Bind services:Format.Visible(ViewModel.Banner.OffersSource), Mode=OneWay}" />
+      </InfoBar.ActionButton>
+    </InfoBar>
 
     <Grid Grid.Row="2" ColumnSpacing="14">
       <Grid.ColumnDefinitions>
@@ -78,6 +81,7 @@
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
 
@@ -89,10 +93,11 @@
             <StackPanel Spacing="3">
               <TextBlock Text="{x:Bind ViewModel.SelectedName, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="16" />
               <TextBlock Text="{x:Bind ViewModel.SelectedSummary, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
-              <TextBlock Text="{x:Bind ViewModel.SelectedCommandLine, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" />
+              <TextBlock Text="{x:Bind ViewModel.SelectedCommandLine, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-              <Button x:Name="RunButton" Style="{StaticResource AccentButtonStyle}" Click="OnRun" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}">
+              <Button x:Name="RunButton" Style="{StaticResource AccentButtonStyle}" Click="OnRun" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                      AutomationProperties.Name="{x:Bind ViewModel.S.RepairRun}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <FontIcon Glyph="&#xE768;" FontSize="13" />
                   <TextBlock Text="{x:Bind ViewModel.S.RepairRun}" />
@@ -102,24 +107,46 @@
             </StackPanel>
           </Grid>
 
-          <Grid Grid.Row="1" ColumnSpacing="12" RowSpacing="6">
+          <Border Grid.Row="1" CornerRadius="8" Padding="12,10" Background="{ThemeResource NiskalaSurfaceRaisedBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1"
+                  Visibility="{x:Bind services:Format.Visible(ViewModel.AcceptsSource), Mode=OneWay}">
+            <Grid ColumnSpacing="12" RowSpacing="4">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <StackPanel Spacing="2">
+                <TextBlock Text="{x:Bind ViewModel.S.RepairSourceTitle}" Style="{StaticResource SectionLabelStyle}" />
+                <TextBlock Text="{x:Bind ViewModel.SourceText, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                <Button Content="{x:Bind ViewModel.S.RepairSourceBrowse}" Click="OnPickSource" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" />
+                <Button Content="{x:Bind ViewModel.S.RepairSourceClear}" Command="{x:Bind ViewModel.ClearSourceCommand}"
+                        Visibility="{x:Bind services:Format.Visible(ViewModel.HasSource), Mode=OneWay}" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" />
+              </StackPanel>
+              <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{x:Bind ViewModel.S.RepairSourceHint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{x:Bind ViewModel.SourceProblem, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}"
+                         Foreground="{ThemeResource NiskalaDangerBrush}" TextWrapping="Wrap" Visibility="{x:Bind services:Format.VisibleText(ViewModel.SourceProblem), Mode=OneWay}" />
+            </Grid>
+          </Border>
+
+          <Grid Grid.Row="2" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
             <ProgressBar IsIndeterminate="False" Minimum="0" Maximum="100" Value="{x:Bind ViewModel.Percent, Mode=OneWay}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.PercentText, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" FontFamily="{StaticResource NiskalaMonoFont}"
                        MinWidth="44" TextAlignment="Right" VerticalAlignment="Center" />
             <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Elapsed, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" FontFamily="{StaticResource NiskalaMonoFont}" VerticalAlignment="Center" />
-            <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{x:Bind ViewModel.LiveLine, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
           </Grid>
 
-          <Border Grid.Row="2" CornerRadius="8" Background="{ThemeResource NiskalaBackgroundBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1" Padding="10,6">
+          <Border Grid.Row="3" CornerRadius="8" Background="{ThemeResource NiskalaBackgroundBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1" Padding="10,6">
             <Grid>
               <ListView x:Name="Log" ItemsSource="{x:Bind ViewModel.Lines}" ItemTemplateSelector="{StaticResource LogTemplates}" SelectionMode="None" IsItemClickEnabled="False">
                 <ListView.ItemContainerStyle>

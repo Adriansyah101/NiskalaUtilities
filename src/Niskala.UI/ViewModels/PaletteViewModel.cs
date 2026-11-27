@@ -28,11 +28,18 @@ public sealed partial class PaletteViewModel : ObservableObject
     [ObservableProperty]
     public partial int SelectedIndex { get; set; } = -1;
 
-    public void Open()
+    public bool Open()
     {
+        if (_services.Navigation.IsLocked || !_services.Apps.Inspector.Leave(FlowExit.Palette))
+        {
+            IsOpen = false;
+            return false;
+        }
+
         Query = string.Empty;
         Rebuild();
         IsOpen = true;
+        return true;
     }
 
     public void Move(int delta)

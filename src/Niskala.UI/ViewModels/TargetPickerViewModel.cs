@@ -51,10 +51,10 @@ public sealed partial class TargetPickerViewModel : ObservableObject
     public partial bool ConfirmingStop { get; set; }
 
     [ObservableProperty]
-    public partial string? Notice { get; set; }
+    public partial string Notice { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? Error { get; set; }
+    public partial string Error { get; set; } = string.Empty;
 
     public string PreviewTitle => Preview is { } hit ? Title(hit) : S.PickerPointAt;
 
@@ -97,8 +97,8 @@ public sealed partial class TargetPickerViewModel : ObservableObject
     private async Task StartAsync()
     {
         IsPicking = true;
-        Error = null;
-        Notice = null;
+        Error = string.Empty;
+        Notice = string.Empty;
         _services.HideMainWindow(true);
         _picker = new WindowPicker(SystemWindowProbe.Instance);
         await Task.Run(_picker.ReadDesktop);
@@ -185,7 +185,7 @@ public sealed partial class TargetPickerViewModel : ObservableObject
         IReadOnlyList<ProcessStop> stops = await Task.Run(() => _actions.Stop(running));
         int stopped = stops.Count(s => s.Result.Outcome is TerminateOutcome.Terminated or TerminateOutcome.Exited);
         Notice = S.PickerStopped(stopped, stops.Count);
-        Error = stopped == stops.Count ? null : string.Join(" ", stops.Where(s => s.Result.Outcome is not (TerminateOutcome.Terminated or TerminateOutcome.Exited)).Select(s => $"{s.Process.Name}: {s.Result.Outcome}"));
+        Error = (stopped == stops.Count ? null : string.Join(" ", stops.Where(s => s.Result.Outcome is not (TerminateOutcome.Terminated or TerminateOutcome.Exited)).Select(s => $"{s.Process.Name}: {s.Result.Outcome}"))) ?? string.Empty;
         await RefreshActionsAsync();
     }
 
@@ -197,7 +197,7 @@ public sealed partial class TargetPickerViewModel : ObservableObject
         List<(StartupEntry Entry, int Error)> results = await Task.Run(() => entries.Select(e => (e, catalog.SetEnabled(e, enabled: false))).ToList());
         int disabled = results.Count(r => r.Error == 0);
         Notice = S.PickerStartupDisabled(disabled);
-        Error = disabled == results.Count ? null : string.Join(" ", results.Where(r => r.Error != 0).Select(r => S.StartupFailed(r.Entry.Name, r.Error)));
+        Error = (disabled == results.Count ? null : string.Join(" ", results.Where(r => r.Error != 0).Select(r => S.StartupFailed(r.Entry.Name, r.Error)))) ?? string.Empty;
         _services.Resources.RefreshCommand.Execute(null);
         await RefreshActionsAsync();
     }
@@ -208,7 +208,7 @@ public sealed partial class TargetPickerViewModel : ObservableObject
         if ((Result?.ItemPath ?? Result?.ImagePath) is { } path)
         {
             int error = ShellLauncher.ShowItem(path);
-            Error = error == 0 ? null : S.OpenFailed(error);
+            Error = (error == 0 ? null : S.OpenFailed(error)) ?? string.Empty;
         }
     }
 
@@ -268,7 +268,7 @@ public sealed partial class TargetPickerViewModel : ObservableObject
     {
         Result = hit;
         ConfirmingStop = false;
-        Notice = null;
+        Notice = string.Empty;
         await RefreshActionsAsync();
     }
 

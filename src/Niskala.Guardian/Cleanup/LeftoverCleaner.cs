@@ -32,6 +32,8 @@ public sealed record CleanOptions
     public bool CreateRestorePoint { get; init; } = true;
 
     public IReadOnlyList<ValueRevert> Reverts { get; init; } = [];
+
+    public string? Into { get; init; }
 }
 
 public sealed record ValueRevert(string Key, RawRegistryValue Previous, RawRegistryValue? Expected);
@@ -91,17 +93,23 @@ public sealed class LeftoverCleaner(
         var records = items.Select(i => new RemovalRecord(i.Kind, i.Path, i.ValueName, RemovalStatus.Pending) { Score = i.Score })
             .Concat(options.Reverts.Select(r => new RemovalRecord(LeftoverKind.RegistryValue, r.Key, r.Previous.Name, RemovalStatus.Pending)))
             .ToArray();
-        var transaction = new TransactionRecord
-        {
-            SchemaVersion = TransactionStore.SchemaVersion,
-            Id = store.NewId(),
-            Kind = options.Kind,
-            AppId = app.Id,
-            AppName = app.DisplayName,
-            StartedAt = _time.GetUtcNow(),
-            Method = options.Permanent ? RemovalMethod.Permanent : RemovalMethod.RecycleBin,
-            Items = records,
-        };
+        TransactionRecord? earlier = options.Into is { } into
+            ? store.Load(into) ?? throw new InvalidOperationException($"No transaction {into}.")
+            : null;
+        IReadOnlyList<RemovalRecord> before = earlier?.Items ?? [];
+        TransactionRecord transaction = earlier is null
+            ? new TransactionRecord
+            {
+                SchemaVersion = TransactionStore.SchemaVersion,
+                Id = store.NewId(),
+                Kind = options.Kind,
+                AppId = app.Id,
+                AppName = app.DisplayName,
+                StartedAt = _time.GetUtcNow(),
+                Method = options.Permanent ? RemovalMethod.Permanent : RemovalMethod.RecycleBin,
+                Items = records,
+            }
+            : earlier with { FinishedAt = null, Items = [.. before, .. records] };
         store.Save(transaction);
         GuardianLog.TransactionStarted(logger, transaction.Id, transaction.Kind, app.Id);
 
@@ -116,13 +124,14 @@ public sealed class LeftoverCleaner(
         progress?.Report(new CleanProgress(CleanStage.Backup));
         var owner = new OwnershipMatcher(fingerprint.Roots, environment);
         (List<RegistryBackupEntry> backup, List<FirewallRule> rules, List<ScheduledTaskXml> definitions) = BackUp(items, records, fingerprint, owner);
-        int unexported = backup.Count > 0 ? store.SaveRegistryBackup(transaction.Id, new RegistryBackup(backup)) : 0;
+        IReadOnlyList<RegistryBackupEntry> kept = earlier is { HasRegistryBackup: true } ? store.LoadRegistryBackup(transaction.Id)?.Entries ?? [] : [];
+        int unexported = backup.Count > 0 ? store.SaveRegistryBackup(transaction.Id, new RegistryBackup([.. kept, .. backup])) : 0;
         transaction = transaction with
         {
-            HasRegistryBackup = backup.Count > 0,
-            FirewallRules = rules,
-            ScheduledTasks = definitions,
-            Items = [.. records],
+            HasRegistryBackup = transaction.HasRegistryBackup || backup.Count > 0,
+            FirewallRules = [.. transaction.FirewallRules, .. rules],
+            ScheduledTasks = [.. transaction.ScheduledTasks, .. definitions],
+            Items = [.. before, .. records],
             Notes = unexported > 0 ? [.. transaction.Notes, GuardianService.UnexportedNote(unexported)] : transaction.Notes,
         };
         store.Save(transaction);
@@ -138,7 +147,7 @@ public sealed class LeftoverCleaner(
                 }
 
                 records[index] = Remove(items[index], records[index], rules, options.Permanent);
-                transaction = transaction with { Items = [.. records] };
+                transaction = transaction with { Items = [.. before, .. records] };
                 store.Save(transaction);
                 progress?.Report(new CleanProgress(CleanStage.Removing, records[index]));
                 GuardianLog.ItemFinished(logger, transaction.Id, records[index].Kind, records[index].Path, records[index].Status, records[index].Detail);
@@ -150,7 +159,7 @@ public sealed class LeftoverCleaner(
             cancellationToken.ThrowIfCancellationRequested();
             int index = items.Count + i;
             records[index] = Revert(options.Reverts[i], records[index]);
-            transaction = transaction with { Items = [.. records] };
+            transaction = transaction with { Items = [.. before, .. records] };
             store.Save(transaction);
             progress?.Report(new CleanProgress(CleanStage.Removing, records[index]));
             GuardianLog.ItemFinished(logger, transaction.Id, records[index].Kind, records[index].Path, records[index].Status, records[index].Detail);
@@ -171,8 +180,8 @@ public sealed class LeftoverCleaner(
             records.Count(r => r.Status == RemovalStatus.Skipped),
             records.Count(r => r.Status == RemovalStatus.Failed));
 
-        IReadOnlyList<string> empty = parents.Find(records
-            .Where(r => r.Kind is LeftoverKind.Folder or LeftoverKind.File && r.Status == RemovalStatus.Removed)
+        IReadOnlyList<string> empty = parents.Find(transaction.Items
+            .Where(r => r.Kind is LeftoverKind.Folder or LeftoverKind.File && r.Status == RemovalStatus.Removed && !r.EmptyFolder)
             .Select(r => r.Path));
         return new CleanResult(transaction, empty);
     }

@@ -4,62 +4,12 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     IsTabStop="False">
-  <UserControl.Resources>
-    <Storyboard x:Name="Intro">
-      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Outline" Storyboard.TargetProperty="StrokeDashOffset" EnableDependentAnimation="True">
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="48" />
-        <EasingDoubleKeyFrame KeyTime="0:0:0.65" Value="0">
-          <EasingDoubleKeyFrame.EasingFunction>
-            <CubicEase EasingMode="EaseInOut" />
-          </EasingDoubleKeyFrame.EasingFunction>
-        </EasingDoubleKeyFrame>
-      </DoubleAnimationUsingKeyFrames>
-      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Outline" Storyboard.TargetProperty="Opacity">
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0" />
-        <LinearDoubleKeyFrame KeyTime="0:0:0.15" Value="1" />
-      </DoubleAnimationUsingKeyFrames>
-      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Tips" Storyboard.TargetProperty="Opacity">
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0" />
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0.45" Value="0" />
-        <LinearDoubleKeyFrame KeyTime="0:0:0.65" Value="1" />
-      </DoubleAnimationUsingKeyFrames>
-      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Shard" Storyboard.TargetProperty="Opacity">
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0" />
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0.4" Value="0" />
-        <LinearDoubleKeyFrame KeyTime="0:0:0.6" Value="1" />
-      </DoubleAnimationUsingKeyFrames>
-      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ShardShift" Storyboard.TargetProperty="X">
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="-2.8" />
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0.4" Value="-2.8" />
-        <EasingDoubleKeyFrame KeyTime="0:0:0.8" Value="0">
-          <EasingDoubleKeyFrame.EasingFunction>
-            <CubicEase EasingMode="EaseOut" />
-          </EasingDoubleKeyFrame.EasingFunction>
-        </EasingDoubleKeyFrame>
-      </DoubleAnimationUsingKeyFrames>
-      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ShardShift" Storyboard.TargetProperty="Y">
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="2.8" />
-        <DiscreteDoubleKeyFrame KeyTime="0:0:0.4" Value="2.8" />
-        <EasingDoubleKeyFrame KeyTime="0:0:0.8" Value="0">
-          <EasingDoubleKeyFrame.EasingFunction>
-            <CubicEase EasingMode="EaseOut" />
-          </EasingDoubleKeyFrame.EasingFunction>
-        </EasingDoubleKeyFrame>
-      </DoubleAnimationUsingKeyFrames>
-    </Storyboard>
-  </UserControl.Resources>
-
   <Viewbox Stretch="Uniform">
     <Canvas Width="110" Height="100">
-      <Path x:Name="Outline" Stroke="White" StrokeThickness="10" StrokeLineJoin="Miter" StrokeMiterLimit="4"
-            StrokeStartLineCap="Flat" StrokeEndLineCap="Flat" StrokeDashCap="Flat" StrokeDashArray="48 48"
+      <Path Stroke="White" StrokeThickness="10" StrokeLineJoin="Miter" StrokeMiterLimit="4" StrokeStartLineCap="Flat" StrokeEndLineCap="Flat"
             Data="M89,9 L89,5 L70,5 L70,61 L18,5 L5,5 L5,95 L24,95 L24,40 L75,95 L89,95 L89,44" />
-      <Path x:Name="Tips" Fill="White" Data="M84,9 L94,9 L84,19 Z M94,34 L94,44 L84,44 Z" />
-      <Path x:Name="Shard" Fill="White" Data="M95,24 L109,10 L109,22 L95,36 Z">
-        <Path.RenderTransform>
-          <TranslateTransform x:Name="ShardShift" />
-        </Path.RenderTransform>
-      </Path>
+      <Path Fill="White" Data="M84,9 L94,9 L84,19 Z M94,34 L94,44 L84,44 Z" />
+      <Path Fill="White" Data="M95,24 L109,10 L109,22 L95,36 Z" />
     </Canvas>
   </Viewbox>
 </UserControl>

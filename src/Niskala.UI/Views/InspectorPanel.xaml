@@ -31,7 +31,8 @@
         <TextBlock Text="{x:Bind ViewModel.Subtitle, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" />
       </StackPanel>
       <Button Grid.Column="2" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Command="{x:Bind ViewModel.CloseCommand}"
-              ToolTipService.ToolTip="{x:Bind ViewModel.S.Close}">
+              ToolTipService.ToolTip="{x:Bind ViewModel.S.Close}" AutomationProperties.Name="{x:Bind ViewModel.S.Close}"
+              Visibility="{x:Bind services:Format.Visible(ViewModel.ShowClose), Mode=OneWay}">
         <FontIcon Glyph="&#xE711;" FontSize="12" />
       </Button>
     </Grid>
@@ -41,7 +42,21 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
-      <InfoBar Margin="20,12,20,0" Severity="Error" IsClosable="True" Message="{x:Bind ViewModel.Error, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Error), Mode=OneWay}" />
+      <StackPanel>
+        <InfoBar Margin="20,12,20,0" Severity="Error" IsClosable="True" Message="{x:Bind ViewModel.Error, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Error), Mode=OneWay}"
+                 Visibility="{x:Bind services:Format.VisibleText(ViewModel.Error), Mode=OneWay}" />
+        <Border x:Name="LockBanner" Margin="20,12,20,0" Padding="12,8" CornerRadius="8" Background="{ThemeResource NiskalaAccentSoftBrush}"
+                Visibility="{x:Bind services:Format.VisibleText(ViewModel.LockNotice), Mode=OneWay}">
+          <Grid ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{ThemeResource NiskalaAccentBrush}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.LockNotice, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+      </StackPanel>
 
       <ScrollViewer Grid.Row="1" Padding="20,16,20,20" Visibility="{x:Bind services:Format.Visible(ViewModel.IsDetails), Mode=OneWay}">
         <StackPanel Spacing="16">
@@ -225,7 +240,8 @@
           <StackPanel VerticalAlignment="Center">
             <StackPanel Visibility="{x:Bind services:Format.Visible(ViewModel.ShowReview), Mode=OneWay}">
               <TextBlock Text="{x:Bind ViewModel.Review.CheckedText, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" />
-              <CheckBox Content="{x:Bind ViewModel.S.Permanent}" IsChecked="{x:Bind ViewModel.Review.Permanent, Mode=TwoWay}" />
+              <CheckBox Content="{x:Bind ViewModel.S.Permanent}" IsChecked="{x:Bind ViewModel.Review.Permanent, Mode=TwoWay}"
+                        Visibility="{x:Bind services:Format.Visible(ViewModel.Review.ShowPermanent), Mode=OneWay}" />
             </StackPanel>
             <TextBlock Text="{x:Bind ViewModel.S.StopWaitingHint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
                        Visibility="{x:Bind services:Format.Visible(ViewModel.CanStopWaiting), Mode=OneWay}" />
@@ -239,9 +255,13 @@
             </StackPanel>
             <Button Content="{x:Bind ViewModel.S.StopWaiting}" Command="{x:Bind ViewModel.StopWaitingCommand}" MinWidth="120"
                     Visibility="{x:Bind services:Format.Visible(ViewModel.CanStopWaiting), Mode=OneWay}" />
-            <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowReview), Mode=OneWay}">
+            <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowForceActions), Mode=OneWay}">
               <Button Content="{x:Bind ViewModel.S.SkipClean}" Command="{x:Bind ViewModel.SkipCleanCommand}" MinWidth="100" />
               <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.S.Clean}" Command="{x:Bind ViewModel.CleanCommand}" MinWidth="150" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowStageActions), Mode=OneWay}">
+              <Button Content="{x:Bind ViewModel.StageSecondaryText, Mode=OneWay}" Command="{x:Bind ViewModel.SkipStageCommand}" MinWidth="120" />
+              <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.StagePrimaryText, Mode=OneWay}" Command="{x:Bind ViewModel.CleanStageCommand}" MinWidth="170" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowDone), Mode=OneWay}">
               <Button Content="{x:Bind ViewModel.S.RemoveEmptyFolders}" Command="{x:Bind ViewModel.RemoveEmptyFoldersCommand}"

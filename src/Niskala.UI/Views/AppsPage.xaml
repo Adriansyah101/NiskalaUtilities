@@ -12,6 +12,7 @@
       PanePlacement="Right"
       DisplayMode="Overlay"
       OpenPaneLength="460"
+      PaneClosing="OnPaneClosing"
       PaneBackground="{ThemeResource NiskalaSurfaceBrush}">
     <SplitView.Pane>
       <Border BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1,0,0,0">

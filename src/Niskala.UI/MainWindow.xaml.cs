@@ -30,6 +30,7 @@ public sealed partial class MainWindow : Window
 
     private readonly App _app;
     private readonly UiServices _services;
+    private readonly nint _handle;
     private readonly OverlappedPresenter _presenter = OverlappedPresenter.Create();
     private readonly DispatcherQueueTimer _promptTimer;
     private bool _hidden;
@@ -43,6 +44,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
 
         nint handle = Win32Interop.GetWindowFromWindowId(AppWindow.Id);
+        _handle = handle;
         Pickers.Owner = handle;
         double scale = WindowNative.Scale(handle);
         _presenter.PreferredMinimumWidth = (int)(MinimumWidth * scale);
@@ -60,13 +62,21 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
         SetTitleBar(TitleBar);
 
-        var palette = new KeyboardAccelerator { Key = VirtualKey.K, Modifiers = VirtualKeyModifiers.Control };
+        Root.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+        var palette = new KeyboardAccelerator { Key = Shortcuts.PaletteKey, Modifiers = Shortcuts.PaletteModifiers };
         palette.Invoked += (_, e) =>
         {
             e.Handled = true;
             _services.Palette.Open();
         };
         Root.KeyboardAccelerators.Add(palette);
+        services.Navigation.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(NavigationViewModel.IsLocked))
+            {
+                Launcher.IsEnabled = services.Navigation.IsUnlocked;
+            }
+        };
 
         Launcher.SizeChanged += (_, _) => UpdatePassthrough();
         Root.SizeChanged += (_, _) => UpdatePassthrough();
@@ -115,6 +125,36 @@ public sealed partial class MainWindow : Window
         AdminPill.Visibility = IsElevated ? Visibility.Visible : Visibility.Collapsed;
         LauncherText.Text = s.PaletteLauncher;
         Host.Child = new ShellView(_services);
+    }
+
+    internal async Task ShowWhenRenderedAsync()
+    {
+        bool cloaked = WindowChrome.Cloak(_handle, true);
+        var rendered = new TaskCompletionSource();
+        int frames = 0;
+        void OnRendering(object? sender, object e)
+        {
+            frames++;
+            if (SplashHandoff.IsReady(frames, Root.IsLoaded))
+            {
+                rendered.TrySetResult();
+            }
+        }
+
+        CompositionTarget.Rendering += OnRendering;
+        try
+        {
+            Activate();
+            await Task.WhenAny(rendered.Task, Task.Delay(SplashHandoff.GiveUp));
+        }
+        finally
+        {
+            CompositionTarget.Rendering -= OnRendering;
+            if (cloaked)
+            {
+                WindowChrome.Cloak(_handle, false);
+            }
+        }
     }
 
     private void OnLauncherClick(object sender, RoutedEventArgs e) => _services.Palette.Open();

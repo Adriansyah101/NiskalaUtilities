@@ -36,7 +36,7 @@ internal static class Format
 
     public static Visibility Collapsed(bool value) => value ? Visibility.Collapsed : Visibility.Visible;
 
-    public static Visibility VisibleText(string? text) => string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+    public static Visibility VisibleText(string? text) => string.IsNullOrWhiteSpace(text) ? Visibility.Collapsed : Visibility.Visible;
 
     public static Visibility NoText(string? text) => string.IsNullOrEmpty(text) ? Visibility.Visible : Visibility.Collapsed;
 
@@ -46,7 +46,7 @@ internal static class Format
 
     public static bool Not(bool value) => !value;
 
-    public static bool HasText(string? text) => !string.IsNullOrEmpty(text);
+    public static bool HasText(string? text) => !string.IsNullOrWhiteSpace(text);
 
     public static SolidColorBrush? Plate(string? color)
     {

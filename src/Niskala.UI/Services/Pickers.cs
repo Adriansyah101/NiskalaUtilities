@@ -13,6 +13,9 @@ internal static class Pickers
 
     public static string? ScanFolder() => FileDialogNative.PickFolder(Owner, Strings.Current.PickScanFolderTitle);
 
+    public static string? RepairImage() =>
+        FileDialogNative.PickFile(Owner, Strings.Current.PickRepairSourceTitle, [(Strings.Current.WindowsImages, "*.wim;*.esd")]);
+
     public static string? AnyFile() => FileDialogNative.PickFile(Owner, Strings.Current.PickWipeTitle, [(Strings.Current.AllFiles, "*.*")]);
 
     public static string? ProgramOrShortcut() =>

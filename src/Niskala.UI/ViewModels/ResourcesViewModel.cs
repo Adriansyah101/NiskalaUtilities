@@ -130,7 +130,7 @@ public sealed partial class ResourcesViewModel : TaskViewModel
         if (row?.Item is { } item && (item.Kind == ResourceKind.StartupFolder ? Path.Combine(item.Location, item.ValueName ?? string.Empty) : item.Program) is { } path)
         {
             int error = ShellLauncher.ShowItem(path);
-            Error = error == 0 ? null : S.OpenFailed(error);
+            Error = (error == 0 ? null : S.OpenFailed(error)) ?? string.Empty;
         }
     }
 
@@ -158,7 +158,7 @@ public sealed partial class ResourcesViewModel : TaskViewModel
 
     internal async Task<ResourceItem?> SwitchAsync(ResourceItem item, bool enabled)
     {
-        Error = null;
+        Error = string.Empty;
         if (_control is not { } control)
         {
             return null;
@@ -173,7 +173,7 @@ public sealed partial class ResourcesViewModel : TaskViewModel
 
         ResourceItem updated = item with { Enabled = enabled };
         _items = [.. _items.Select(i => i.Id == item.Id ? updated : i)];
-        Info = item.Kind == ResourceKind.ContextMenu ? S.ExplorerRestartNeeded : null;
+        Info = (item.Kind == ResourceKind.ContextMenu ? S.ExplorerRestartNeeded : null) ?? string.Empty;
         Services.History.Invalidate();
         UpdateSummary();
         return updated;

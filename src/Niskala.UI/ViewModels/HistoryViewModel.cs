@@ -9,7 +9,7 @@ using Niskala.UI.Services;
 
 namespace Niskala.UI.ViewModels;
 
-public sealed record RecordRow(string Glyph, string Path, string Status, string? Detail, bool IsGood, bool IsBad);
+public sealed record RecordRow(string Glyph, string Path, string Status, string Detail, bool IsGood, bool IsBad);
 
 public sealed class TransactionItem(TransactionRecord record)
 {
@@ -56,13 +56,13 @@ public sealed partial class HistoryViewModel : ObservableObject
     public partial TransactionItem? Selected { get; set; }
 
     [ObservableProperty]
-    public partial string? Report { get; set; }
+    public partial string Report { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial TextList ReportLines { get; set; } = [];
 
     [ObservableProperty]
-    public partial string? Error { get; set; }
+    public partial string Error { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RestoreCommand))]
@@ -90,7 +90,7 @@ public sealed partial class HistoryViewModel : ObservableObject
         },
         i.ValueName is null ? i.Path : $"{i.Path} → {(i.ValueName.Length == 0 ? S.DefaultValue : i.ValueName)}",
         S.Status(i.Status),
-        i.Detail,
+        i.Detail ?? string.Empty,
         i.Status is RemovalStatus.Removed or RemovalStatus.Reverted or RemovalStatus.Restored,
         i.Status is RemovalStatus.Failed)).Concat(Selected.Record.Settings.Select(s => new RecordRow(
         s.Kind switch
@@ -101,7 +101,7 @@ public sealed partial class HistoryViewModel : ObservableObject
         },
         s.Label is { } label ? $"{label} · {s.Target}" : s.Target,
         S.SettingStatusText(s.Status),
-        s.Detail,
+        s.Detail ?? string.Empty,
         s.Status is SettingStatus.Applied or SettingStatus.Restored,
         s.Status is SettingStatus.Failed))) ?? []];
 
@@ -161,7 +161,7 @@ public sealed partial class HistoryViewModel : ObservableObject
         }
 
         IsBusy = true;
-        Error = null;
+        Error = string.Empty;
         try
         {
             TransactionRestorer restorer = _services.Host.CreateTransactionRestorer();

@@ -10,20 +10,6 @@ internal static class Motion
 
     public static bool Enabled => Settings.AnimationsEnabled;
 
-    public static Task RunAsync(this Storyboard storyboard)
-    {
-        var done = new TaskCompletionSource();
-        storyboard.Completed += OnCompleted;
-        storyboard.Begin();
-        return done.Task;
-
-        void OnCompleted(object? sender, object e)
-        {
-            storyboard.Completed -= OnCompleted;
-            done.TrySetResult();
-        }
-    }
-
     public static Storyboard Tween(this Storyboard storyboard, DependencyObject target, string property, double from, double to, TimeSpan duration)
     {
         var animation = new DoubleAnimation

@@ -55,6 +55,15 @@ public sealed class UiServices : IDisposable
         History = new HistoryViewModel(this);
         Updates = new UpdatesViewModel(this);
         Palette = new PaletteViewModel(this);
+        Navigation.CanLeave = section => section == Section.Apps || Apps.Inspector.Leave(FlowExit.Navigate);
+        Apps.Inspector.LockChanged += () =>
+        {
+            Navigation.IsLocked = Apps.Inspector.IsLocked;
+            if (Navigation.IsLocked)
+            {
+                Palette.IsOpen = false;
+            }
+        };
     }
 
     public event Action? ThemeToggleRequested;
@@ -107,7 +116,7 @@ public sealed class UiServices : IDisposable
         Apps.Inspector.IsBusy || Apps.Inspector.ShowScrim || Repair.IsRunning || Tracker.IsRecording || Tracker.IsBusy || Updates.IsDownloading ||
         ((TaskViewModel[])[QuickScan, SelectiveClean, Integrity, Resources, Suspend, Storage, Duplicates, Wipe]).Any(t => t.IsBusy);
 
-    public void Navigate(Section section) => Navigation.Select(section);
+    public bool Navigate(Section section) => Navigation.Select(section);
 
     public void ToggleTheme() => ThemeToggleRequested?.Invoke();
 

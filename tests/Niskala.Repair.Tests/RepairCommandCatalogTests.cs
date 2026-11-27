@@ -100,7 +100,9 @@ public sealed class RepairCommandCatalogTests
     [InlineData("chkdsk.exe", "C:", "/X")]
     [InlineData("chkdsk.exe", "C:", "/spotfix")]
     [InlineData("chkdsk.exe", "C:", "/offlinescanandfix")]
-    [InlineData("Dism.exe", "/Online", "/Cleanup-Image", "/RestoreHealth", "/Source:wim:D:\\x.wim:1")]
+    [InlineData("Dism.exe", "/Online", "/Cleanup-Image", "/RestoreHealth", "/Source:C:\\Windows\\WinSxS")]
+    [InlineData("Dism.exe", "/Online", "/Cleanup-Image", "/RestoreHealth", "/Source:wim:\\\\server\\share\\x.wim:1")]
+    [InlineData("Dism.exe", "/Online", "/Cleanup-Image", "/RestoreHealth", "/Source:wim:D:\\x.esd:1")]
     [InlineData("netsh.exe", "advfirewall", "reset")]
     [InlineData("sfc.exe", "/scannow", "&", "format")]
     public void An_invocation_refuses_arguments_outside_the_allowlist(string executable, params string[] arguments)

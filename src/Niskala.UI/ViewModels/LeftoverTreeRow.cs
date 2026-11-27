@@ -64,8 +64,16 @@ public sealed partial class LeftoverTreeRow : ObservableObject
     {
         LeftoverKind.RegistryValue => $"{Node.ValueType} · {Node.Data}",
         LeftoverKind.File or LeftoverKind.Folder => Join(SizeText, Modified),
-        _ => Modified ?? string.Empty,
+        _ => Modified,
     };
+
+    public string LocationLabel => IsFile ? Strings.Current.FilePath : Strings.Current.RegistryPath;
+
+    public string Location => Node.Path;
+
+    public bool HasValueName => Node.Kind == LeftoverKind.RegistryValue;
+
+    public string ValueNameText => ValueLabel ?? string.Empty;
 
     public string? Data => Node.Data;
 
@@ -79,7 +87,7 @@ public sealed partial class LeftoverTreeRow : ObservableObject
         _ => string.Empty,
     };
 
-    public string? Modified => Node.Modified?.ToLocalTime().ToString("g", Format.Culture);
+    public string Modified => Node.Modified?.ToLocalTime().ToString("g", Format.Culture) ?? string.Empty;
 
     public string ScoreText => Leftover.Score.ToString(Format.Culture);
 
@@ -105,7 +113,7 @@ public sealed partial class LeftoverTreeRow : ObservableObject
     public partial bool? IsChecked { get; set; }
 
     [ObservableProperty]
-    public partial string? Note { get; set; }
+    public partial string Note { get; set; } = string.Empty;
 
     private string? ValueLabel => Node.Kind == LeftoverKind.RegistryValue
         ? Node.ValueName is { Length: > 0 } name ? name : Strings.Current.DefaultValue

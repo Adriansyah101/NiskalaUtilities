@@ -73,7 +73,7 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
     public partial string Status { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? Page { get; set; }
+    public partial string Page { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial double Percent { get; set; }
@@ -82,10 +82,10 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
     public partial string Progress { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? Error { get; set; }
+    public partial string Error { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? Result { get; set; }
+    public partial string Result { get; set; } = string.Empty;
 
     public bool IsIdle => !IsChecking && !IsDownloading;
 
@@ -155,8 +155,8 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
             return;
         }
 
-        Error = null;
-        Result = null;
+        Error = string.Empty;
+        Result = string.Empty;
         Percent = 0;
         Progress = string.Empty;
         IsDownloading = true;
@@ -198,7 +198,7 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void OpenPage()
     {
-        if (Page is { } page)
+        if (Page is { Length: > 0 } page)
         {
             ShellLauncher.OpenLink(page);
         }
@@ -206,8 +206,8 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
 
     private async Task RunCheckAsync(bool quiet)
     {
-        Error = null;
-        Result = null;
+        Error = string.Empty;
+        Result = string.Empty;
         Status = S.UpdateChecking;
         IsChecking = true;
         try
@@ -216,7 +216,7 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
             _check = check;
             IsAvailable = check.IsAvailable && _updater.Value.PackageFor(check) is not null && check.Assets.Checksums is not null;
             Latest = check.Latest?.ToString() ?? "—";
-            Page = check.Page?.AbsoluteUri;
+            Page = check.Page?.AbsoluteUri ?? string.Empty;
             ShowNotes();
             Status = check.Published is { } published
                 ? $"{S.UpdateStatusText(check.Status, check.Latest?.ToString())} {S.UpdatePublished(Format.When(published))}"
@@ -234,7 +234,7 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
         catch (Exception ex) when (Describe(ex) is { } text)
         {
             Status = quiet ? S.UpdateNotChecked : string.Empty;
-            Error = quiet ? null : text;
+            Error = (quiet ? null : text) ?? string.Empty;
         }
         finally
         {

@@ -62,7 +62,7 @@ public sealed class RepairInvocation
                 throw new ArgumentException($"{argument} changes data beyond a non-destructive repair.", nameof(arguments));
             }
 
-            if (!Tokens.Contains(argument) && !IsDriveToken(argument))
+            if (!Tokens.Contains(argument) && !IsDriveToken(argument) && !RepairSource.IsArgument(argument))
             {
                 throw new ArgumentException($"{argument} is not a repair argument.", nameof(arguments));
             }
@@ -79,7 +79,7 @@ public sealed class RepairInvocation
 
     public IReadOnlyList<string> Arguments { get; }
 
-    public string CommandLine => $"{Executable} {string.Join(' ', Arguments)}";
+    public string CommandLine => $"{Executable} {string.Join(' ', Arguments.Select(a => a.Contains(' ', StringComparison.Ordinal) ? $"\"{a}\"" : a))}";
 
     internal static bool IsDestructive(string argument)
     {

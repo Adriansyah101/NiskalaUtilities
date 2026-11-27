@@ -14,7 +14,7 @@ analysed or reused.
 One engine, two front ends: `niskala.exe`, a command line, and `Niskala.exe`, a WinUI 3 desktop
 app. Both are Native AOT builds (`win-x64`, `win-arm64`). The product name is Niskala Utilities;
 namespaces, file names, the `.nsklog` extension and `%LocalAppData%\Niskala` keep the short name.
-This is an early release: version 0.1.3. Released under the GNU General Public License v3.0; see
+This is an early release: version 0.2.0. Released under the GNU General Public License v3.0; see
 [License](#license).
 
 ## Modules
@@ -163,7 +163,7 @@ first failure:
 6. **Privacy scan.** Every shipped file is searched as ASCII and as UTF-16 for the user name, the
    machine name, the profile path and the repository path. Any hit fails the build.
 7. **Installer.** `ISCC.exe` compiles `installer/NiskalaUtilities.iss` from both payloads into
-   `NiskalaUtilities-Setup-v0.1.3-win-x64.exe` (LZMA2 ultra64, solid). It installs to
+   `NiskalaUtilities-Setup-v0.2.0-win-x64.exe` (LZMA2 ultra64, solid). It installs to
    `%ProgramFiles%\Niskala Utilities` with the desktop app at the root, the optional command line
    in `cli\` (its own `niskala.exe` and `lib\`, since the two names collide), a Start menu
    shortcut, an optional desktop shortcut and an optional `PATH` entry for `cli\`, which the
@@ -174,7 +174,7 @@ first failure:
 8. **Archives.** Each payload is zipped with its folder at the root by
    `scripts/New-ReleaseArchive.cs` (`dotnet run --file`, `CompressionLevel.SmallestSize`; Windows
    PowerShell 5.1 runs on .NET Framework, which lacks that level):
-   `NiskalaUtilities-v0.1.3-win-x64.zip` and `NiskalaUtilities-CLI-v0.1.3-win-x64.zip`.
+   `NiskalaUtilities-v0.2.0-win-x64.zip` and `NiskalaUtilities-CLI-v0.2.0-win-x64.zip`.
    `SHA256SUMS.txt` lists the installer and the two zips in `sha256sum -c` format, and the build
    fails if `artifacts/release` holds any other file. Upload it with
    every release: the updater refuses a release without it.
@@ -224,7 +224,7 @@ niskala logs show <id> [--json]
 niskala logs rollback <id> [--dry-run] [--yes] [--permanent] [--no-restore-point] [--json]
 niskala logs delete <id> [--yes]
 niskala repair list [--json]
-niskala repair run <command> [--yes] [--json]
+niskala repair run <command> [--yes] [--json] [--source <image>]
 niskala optimize list [--kind <kind>...] [--json]
 niskala optimize disable|enable <id|name> [--dry-run] [--yes] [--json]
 niskala optimize processes [--idle] [--sample <seconds>] [--json]
@@ -300,14 +300,20 @@ matches no application or several.
 
 ## Desktop app
 
-`Niskala.exe` (WinUI 3, unpackaged, Native AOT) runs elevated. It opens with a splash card while
-the main window is built: 560 x 320, borderless, out of the taskbar, rounded at 12 px with clear
-corners, on the brand gradient (`#183D66` to `#08111E`). The double-line N draws itself (0 to
-0.65 s), its cut-off corner fades in and slides 4 px up and to the right (0.4 to 0.8 s), `NISKALA`
-and `UTILITIES` fade in and rise (0.55 to 1 s), and the card fades out once the main window is
-ready (from 1.15 s). Everything is XAML: the monogram is one vector control (`NiskalaMark`) shared
-by the splash and the title bar, animated by storyboards; no image file is loaded. The executables
-carry `assets/niskala.ico` (16 to 256 px), and the main window takes its icon from that resource.
+`Niskala.exe` (WinUI 3, unpackaged, Native AOT) runs elevated. The small launcher in the release
+root starts it and shows the splash card while the main window is built: 560 x 320, out of the
+taskbar, rounded at 12 px, on the brand gradient (`#183D66` to `#08111E`), drawn with Direct2D and
+DirectWrite into a premultiplied bitmap and shown with `UpdateLayeredWindow`. Its loop runs on
+`QueryPerformanceCounter` time and waits for each desktop frame with `DwmFlush`, with cubic easing
+throughout: the card fades in (140 ms), the N and its cut-off corner fade in and settle a few pixels
+(0 to 0.52 s), and `NISKALA` and `UTILITIES` follow (0.16 to 0.68 s). The app renders its first
+page while its window is still cloaked, shows it whole after three rendered frames and then sets
+the event `Local\NiskalaUtilities.SplashReady`; the launcher answers with one 200 ms fade-out of the
+whole card, so the background, the mark and the name fade together over the finished window. The
+splash gives up after 30 seconds or as soon as the app exits. Started without the launcher, the app
+simply appears when it has drawn its first frame. The title bar's monogram is one vector control
+(`NiskalaMark`); no image file is loaded. The executables carry `assets/niskala.ico` (16 to 256 px),
+and the main window takes its icon from that resource.
 A left rail, open and docked at start (272 px, folded to a 56 px icon bar by its menu button), holds
 thirteen sections under four categories (Apps, Cleaning, Performance, Maintenance), each an item with
 its own icon that opens and closes its pages with a click. The category of the page on screen starts
@@ -335,18 +341,30 @@ and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:
   removal flow is open, a dark layer (`NiskalaScrimBrush`) covers the list behind the drawer.
 - **Uninstall, Force Remove, Steam and Batch Remove flows.** Starting one widens the drawer into a layout locked to the
   window height, without a page scroll bar, that fits from 720 px up: a one-line stepper
-  (fingerprint, restore point, live process tree, leftover scan, review; force and Steam have their
-  own steps), a progress bar with the active phase and counters (processes running, leftovers
-  found), a work area, and an action bar pinned to the bottom (Cancel and Start, Stop waiting, Keep
-  everything and Clean selected, Scan leftovers, Finish). While the flow runs, the work area is an
-  activity log that follows the newest line: steps, every process of the uninstaller's job, checks,
-  and each item the Guardian removes. At the review it becomes two trees, files and folders or
-  registry and firewall, filtered by Safe, Review and Low, beside a detail pane: full path, kind,
-  value type and data or size and date, the confidence and the reasons behind it. A row expands into
-  its subfolders and files or subkeys and values (`REG_*` type and data); checking a row checks
-  everything in it, checking part of it leaves the row partly checked, and only the checked parts
-  go. Only the trees and the log scroll. When an install log exists for the app, the review lists
-  the log's exact rollback instead of a heuristic scan.
+  (fingerprint, restore point, live process tree, leftover scan, leftover files, leftover registry;
+  Steam and Batch Remove end with the same three leftover steps, Force Remove has its own steps), a
+  progress bar with the active phase and counters (processes running, leftovers found), a work
+  area, and an action bar pinned to the bottom (Cancel and Start, Stop waiting, the buttons of the
+  leftover step, Scan leftovers, Finish). While the flow runs, the work area is an activity log that
+  follows the newest line: steps, every process of the uninstaller's job, checks, and each item the
+  Guardian removes. **Leftover files** then lists only files and folders, filtered by Safe, Review
+  and Low, beside a detail pane (location, kind, size and date, the confidence and the reasons behind
+  it), with **Select shown**, **Clear shown** and the permanent-delete option; **Clean files &
+  continue** removes the checked ones and **Skip files** keeps them. **Leftover registry** follows
+  with registry keys, values, firewall rules and scheduled tasks and the same pane (registry path,
+  value name, `REG_*` type and data, confidence, reasons); **Clean registry** removes the checked ones
+  and **Finish without deleting** leaves them. With no leftover files the flow goes straight to the
+  registry step, and with nothing at all it says so and finishes. A row expands into its subfolders
+  and files or subkeys and values; checking a row checks everything in it, checking part of it
+  leaves the row partly checked, and only the checked parts go. Both steps write into one journal
+  entry (`CleanOptions.Into`), so **History & backups** restores the files and the registry together.
+  When an install log exists for the app, the two steps list the log's exact rollback instead of a
+  heuristic scan, and the registry step also writes back the values the install changed. Until the
+  app is uninstalled, Cancel, the close button, a click beside the drawer, `Esc` or another page in
+  the rail cancels the flow and closes the drawer (a running uninstaller is no longer followed, never
+  killed). Once it is uninstalled (`FlowGate`), the close button goes away, clicks beside the drawer
+  and `Esc` are ignored, and the rail and `Ctrl+K` stay locked, with a note in the drawer, until the
+  last leftover step is cleaned or skipped.
 - **Install Tracker.** Choose an installer, record it, finish early or abandon it; the logs list
   shows each `.nsklog` with its changes and rolls it back through the same review.
 - **Target Picker.** The main window steps aside; a topmost layered overlay dims the screen except the
@@ -389,12 +407,18 @@ and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:
   Every page is locked to the window height; only its lists scroll.
 - **System Repair.** The repair list on the left; on the right the selected command line, Run and
   Cancel, a progress bar from 0 to 100 fed by the parsed percentage with the number beside it
-  (`42%`), the elapsed time, the line the tool is redrawing, and a log that follows the newest line.
-  A tool that prints no percentage (ipconfig, netsh) goes from 0% to 100% when it finishes. A run
-  that ends normally says `Finished · 0:00:48` (`Selesai · 0:00:48`) with no exit code; only a
-  failure says what went wrong, and an exit code appears only when no plainer reason is known. The page is
-  locked to the window height; only the list and the log scroll. A repair that changes Windows asks
-  first, and only one runs at a time.
+  (`42%`), the elapsed time, and a log that follows the newest line. A line the tool redraws with
+  `\r` is updated in place in the log, as in a console, and kept only when its `\n` arrives
+  (`ConsoleTranscript`); consecutive progress lines of the same shape fold into one as well. A tool
+  that prints no percentage (ipconfig, netsh) goes from 0% to 100% when it finishes. One banner
+  shows the last run: green when it ends normally (`Finished · 0:00:48`, `Selesai · 0:00:48`),
+  yellow for a restart, problems found or a cancel, red for a failure, never without text; it is
+  cleared when a run starts or another repair is picked. **Repair the component store** has an
+  optional repair source: `install.wim` or `install.esd` from a Windows ISO, used as
+  `/Source:WIM:<path>:1 /LimitAccess` (or `ESD`). When DISM stops with `0x800F0915` or `0x800F081F`,
+  the banner explains it and offers to choose an image and run again. The page is locked to the
+  window height; only the list and the log scroll. A repair that changes Windows asks first, and
+  only one runs at a time.
 - **History & backups.** Every Guardian transaction with its items, restore point and method, and
   the restore.
 
@@ -412,7 +436,7 @@ enum; `RepairCommandCatalog.Resolve` maps each value to a program in the directo
 | Name | Command | Notes |
 |---|---|---|
 | `dism-check-health` | `Dism.exe /Online /Cleanup-Image /CheckHealth` | Reads only. |
-| `dism-restore-health` | `Dism.exe /Online /Cleanup-Image /RestoreHealth` | Repairs the component store from Windows Update. |
+| `dism-restore-health` | `Dism.exe /Online /Cleanup-Image /RestoreHealth` | Repairs the component store from Windows Update, or with a source from `/Source:WIM:<image>:1 /LimitAccess` (`ESD` for `.esd`). |
 | `sfc-scan` | `sfc.exe /scannow` | Replaces damaged protected files from the component store. |
 | `dism-component-cleanup` | `Dism.exe /Online /Cleanup-Image /StartComponentCleanup` | Never `/ResetBase`, so installed updates stay uninstallable. |
 | `winsock-reset` | `netsh.exe winsock reset` | Needs a restart. |
@@ -423,9 +447,11 @@ enum; `RepairCommandCatalog.Resolve` maps each value to a program in the directo
 Every one needs elevation: the runner checks the token first and returns `NotElevated` without
 starting anything. The public API takes only a `RepairCommandId`. `RepairInvocation`, the resolved
 program and arguments, has an internal constructor that accepts only the five programs and the
-argument tokens above (plus a drive letter) and refuses the destructive switches by name, so no
-caller can build another command line. A program that is missing or is a reparse point is not
-started.
+argument tokens above (plus a drive letter and a well-formed image source) and refuses the
+destructive switches by name, so no caller can build another command line. A repair source is a
+`RepairSource`: a full local path to an existing `.wim` or `.esd` file that is not a link, with no
+quotes, wildcards or further colons, always image 1, and only `dism-restore-health` takes one. A
+program that is missing or is a reparse point is not started.
 
 The runner starts the program with `UseShellExecute = false`, `CreateNoWindow`, the argument list
 quoted by .NET, standard input closed, and standard output and error redirected. Both pipes are read
@@ -448,13 +474,16 @@ the exit, and returns `Cancelled`; the process object and its pipes are disposed
 codes map to an outcome and a diagnostic: `0` succeeded (or restart required for the network
 resets), `3010` restart required, `740` elevation required, `5` access denied, `87` an option this
 Windows does not know, DISM's `0x800F081F` (no repair source), `0x800F0906` (download failed),
-`0x800F0907` (Group Policy), `0x800F082F` (pending servicing operations), and chkdsk's `1` and `2`
-as success and `3` as problems that need an offline repair. Anything else is `Failed` with its code.
+`0x800F0915` (Windows Update could not supply the repair files), `0x800F0907` (Group Policy),
+`0x800F082F` (pending servicing operations), and chkdsk's `1` and `2` as success and `3` as problems
+that need an offline repair. Anything else is `Failed` with its code. The first three suggest a
+local repair source.
 
 `niskala repair run` prints the tool's lines as they come; on a console the redrawn line is updated
 in place. It asks before a repair that changes Windows (`--yes` skips the question) and exits with
 `0`, `3010` when a restart is needed, `740` when not elevated, `130` when cancelled with Ctrl+C,
 and `1` otherwise. `--json` writes the result to stdout and the tool's output to stderr.
+`--source <image>` repairs `dism-restore-health` from a local `install.wim` or `install.esd`.
 
 ## Cleaner
 
@@ -641,7 +670,7 @@ The Updates page (the rail's footer, or Ctrl+K) and `niskala update` share `Nisk
 1. **Check.** `GET https://api.github.com/repos/Adriansyah101/NiskalaUtilities/releases/latest`
    with `User-Agent: NiskalaUtilities/<version>`, read through a source-generated
    `JsonSerializerContext`. Drafts, pre-releases and pre-release tags are skipped; a `404` means no
-   release yet. The tag (`v0.1.3` or `V0.1.3`) is compared with the running version by semantic
+   release yet. The tag (`v0.2.0` or `V0.2.0`) is compared with the running version by semantic
    versioning precedence. Only assets named exactly for that version and runtime and served from
    `github.com` count: `NiskalaUtilities-Setup-v<version>-<rid>.exe`,
    `NiskalaUtilities-v<version>-<rid>.zip`, `NiskalaUtilities-CLI-v<version>-<rid>.zip` and

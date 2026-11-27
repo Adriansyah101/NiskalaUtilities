@@ -65,7 +65,11 @@
                       <DoubleAnimation Storyboard.TargetName="HoverFill" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
                     </Storyboard>
                   </VisualState>
-                  <VisualState x:Name="Disabled" />
+                  <VisualState x:Name="Disabled">
+                    <VisualState.Setters>
+                      <Setter Target="Pill.Opacity" Value="0.45" />
+                    </VisualState.Setters>
+                  </VisualState>
                 </VisualStateGroup>
                 <VisualStateGroup x:Name="EmphasisStates">
                   <VisualStateGroup.Transitions>
@@ -157,7 +161,7 @@
                        AutomationProperties.Name="{x:Bind S.NavTogglePane}" ToolTipService.ToolTip="{x:Bind S.NavTogglePane}" IsCompact="True" />
 
       <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <ItemsControl ItemsSource="{x:Bind Nav.Categories}" XYFocusKeyboardNavigation="Enabled" IsTabStop="False">
+        <ItemsControl x:Name="Rail" ItemsSource="{x:Bind Nav.Categories}" XYFocusKeyboardNavigation="Enabled" IsTabStop="False" IsEnabled="{x:Bind Nav.IsUnlocked, Mode=OneWay}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <StackPanel Spacing="2" />
@@ -188,7 +192,8 @@
       <StackPanel Grid.Row="2" Spacing="2" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0" XYFocusKeyboardNavigation="Enabled">
         <Grid>
           <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="{x:Bind Nav.Updates.Glyph}" Label="{x:Bind Nav.Updates.Title, Mode=OneWay}"
-                           IsActive="{x:Bind Nav.Updates.IsSelected, Mode=OneWay}" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Click="OnUpdatesClick" />
+                           IsActive="{x:Bind Nav.Updates.IsSelected, Mode=OneWay}" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Click="OnUpdatesClick"
+                           IsEnabled="{x:Bind Nav.IsUnlocked, Mode=OneWay}" />
           <InfoBadge Style="{ThemeResource AttentionDotInfoBadgeStyle}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="26,7,0,0" IsHitTestVisible="False"
                      Visibility="{x:Bind services:Format.Visible(Updates.IsAvailable), Mode=OneWay}" />
         </Grid>

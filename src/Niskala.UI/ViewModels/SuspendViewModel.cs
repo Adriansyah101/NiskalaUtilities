@@ -146,7 +146,7 @@ public sealed partial class SuspendViewModel : TaskViewModel
             row.IsCapped = true;
         }
 
-        Error = result.Outcome == RestraintOutcome.Applied ? null : S.RestraintFailed(row.Name, result);
+        Error = (result.Outcome == RestraintOutcome.Applied ? null : S.RestraintFailed(row.Name, result)) ?? string.Empty;
     }
 
     internal void Release(SuspendRow row)
@@ -179,7 +179,7 @@ public sealed partial class SuspendViewModel : TaskViewModel
     {
         if (result.Outcome is RestraintOutcome.Applied or RestraintOutcome.Undone or RestraintOutcome.NotRestrained)
         {
-            Error = null;
+            Error = string.Empty;
             row.Update(kind);
             return;
         }

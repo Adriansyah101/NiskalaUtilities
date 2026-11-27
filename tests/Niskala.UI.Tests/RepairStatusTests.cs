@@ -54,11 +54,36 @@ public sealed class RepairStatusTests
     }
 
     [Theory]
-    [InlineData(false, "Failed · 0:00:48. DISM found no repair source; check that Windows Update is reachable.")]
-    [InlineData(true, "Gagal · 0:00:48. DISM tidak menemukan sumber perbaikan; pastikan Windows Update bisa dijangkau.")]
+    [InlineData(false, "Failed · 0:00:48. DISM found no repair source files (0x800F081F). Check the internet connection and the Windows Update service, or choose install.wim or install.esd from a Windows ISO as a local repair source.")]
+    [InlineData(true, "Gagal · 0:00:48. DISM tidak menemukan berkas sumber perbaikan (0x800F081F). Periksa koneksi internet dan layanan Windows Update, atau pilih install.wim atau install.esd dari ISO Windows sebagai sumber perbaikan lokal.")]
     public void A_known_failure_explains_itself_in_plain_words(bool indonesian, string expected)
     {
         Assert.Equal(expected, Strings.For(indonesian).RepairStatus(Result(RepairOutcome.Failed, RepairDiagnostic.SourceFilesMissing, RepairExitCodes.SourceFilesMissing), Elapsed));
+    }
+
+    [Theory]
+    [InlineData(false, "Failed · 0:00:48. Windows Update could not supply the repair files (0x800F0915): they were not found or could not be downloaded. Check the internet connection and the Windows Update service, or choose install.wim or install.esd from a Windows ISO as a local repair source.")]
+    [InlineData(true, "Gagal · 0:00:48. Windows Update tidak dapat menyediakan berkas perbaikan (0x800F0915): berkasnya tidak ditemukan atau tidak dapat diunduh. Periksa koneksi internet dan layanan Windows Update, atau pilih install.wim atau install.esd dari ISO Windows sebagai sumber perbaikan lokal.")]
+    public void A_repair_source_that_windows_update_cannot_supply_points_to_a_local_image(bool indonesian, string expected)
+    {
+        (RepairOutcome outcome, RepairDiagnostic diagnostic) = RepairExitCodes.Interpret(RepairCommandCatalog.Get(RepairCommandId.DismRestoreHealth), RepairExitCodes.RepairSourceNotFound);
+
+        Assert.Equal(expected, Strings.For(indonesian).RepairStatus(Result(outcome, diagnostic, RepairExitCodes.RepairSourceNotFound), Elapsed));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Every_refused_source_has_a_reason(bool indonesian)
+    {
+        Strings s = Strings.For(indonesian);
+        foreach (RepairSourceProblem problem in Enum.GetValues<RepairSourceProblem>().Where(p => p != RepairSourceProblem.None))
+        {
+            Assert.False(string.IsNullOrWhiteSpace(s.RepairSourceRefused(problem)));
+        }
+
+        Assert.Contains(@"D:\sources\install.wim", s.RepairSourceLocal(@"D:\sources\install.wim", 1), StringComparison.Ordinal);
+        Assert.Contains("Windows Update", s.RepairSourceDefault, StringComparison.Ordinal);
     }
 
     [Theory]

@@ -39,7 +39,10 @@ public sealed class RepairProcessRunner(IRepairEnvironment environment, ILogger<
 
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
-    public async Task<RepairResult> RunAsync(RepairCommandId id, IProgress<RepairUpdate>? progress = null, CancellationToken cancellationToken = default)
+    public Task<RepairResult> RunAsync(RepairCommandId id, IProgress<RepairUpdate>? progress = null, CancellationToken cancellationToken = default) =>
+        RunAsync(id, null, progress, cancellationToken);
+
+    public async Task<RepairResult> RunAsync(RepairCommandId id, RepairSource? source, IProgress<RepairUpdate>? progress = null, CancellationToken cancellationToken = default)
     {
         RepairCommand command = RepairCommandCatalog.Get(id);
         if (command.NeedsElevation && !environment.IsElevated)
@@ -48,7 +51,7 @@ public sealed class RepairProcessRunner(IRepairEnvironment environment, ILogger<
             return new RepairResult(id, RepairOutcome.NotElevated, RepairDiagnostic.ElevationRequired, null, null, null, TimeSpan.Zero);
         }
 
-        RepairInvocation invocation = RepairCommandCatalog.Resolve(id, environment);
+        RepairInvocation invocation = RepairCommandCatalog.Resolve(id, environment, source);
         long start = _time.GetTimestamp();
         RepairLog.Started(logger, command.Name, invocation.CommandLine);
         ProcessRun run = await RunProcessAsync(invocation.FileName, invocation.Arguments, progress, cancellationToken).ConfigureAwait(false);

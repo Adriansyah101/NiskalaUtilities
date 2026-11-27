@@ -67,12 +67,11 @@ public sealed class LogLine(string text, LogLineKind kind)
 
 public sealed partial class RepairViewModel : ObservableObject, IDisposable
 {
-    private const int MaxLines = 5000;
-
     private static readonly TimeSpan Tick = TimeSpan.FromSeconds(1);
 
     private readonly UiServices _services;
     private readonly DispatcherQueueTimer _clock;
+    private readonly ConsoleTranscript _transcript = new();
     private RepairProcessRunner? _runner;
     private CancellationTokenSource? _cancel;
     private DateTimeOffset _started;
@@ -97,12 +96,21 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
 
     public LogLineCollection Lines { get; } = [];
 
+    public StatusBanner Banner { get; } = new();
+
     public Strings S => Strings.Current;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedName), nameof(SelectedCommandLine), nameof(SelectedSummary))]
+    [NotifyPropertyChangedFor(nameof(SelectedName), nameof(SelectedCommandLine), nameof(SelectedSummary), nameof(AcceptsSource))]
     [NotifyCanExecuteChangedFor(nameof(RunCommand))]
     public partial RepairRow? Selected { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedCommandLine), nameof(SourceText), nameof(HasSource))]
+    public partial RepairSource? Source { get; set; }
+
+    [ObservableProperty]
+    public partial string SourceProblem { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
@@ -114,19 +122,7 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
     public partial double Percent { get; set; }
 
     [ObservableProperty]
-    public partial string LiveLine { get; set; } = string.Empty;
-
-    [ObservableProperty]
     public partial string Elapsed { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string? Error { get; set; }
-
-    [ObservableProperty]
-    public partial string? Warning { get; set; }
-
-    [ObservableProperty]
-    public partial string? Result { get; set; }
 
     public bool IsIdle => !IsRunning;
 
@@ -134,9 +130,17 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
 
     public string SelectedName => Selected?.Name ?? string.Empty;
 
-    public string SelectedCommandLine => Selected?.CommandLine ?? string.Empty;
+    public string SelectedCommandLine => Selected is not { } row ? string.Empty
+        : AcceptsSource && Source is { } source ? RepairCommandCatalog.Resolve(row.Command.Id, SystemRepairEnvironment.Instance, source).CommandLine
+        : row.CommandLine;
 
     public string SelectedSummary => Selected?.Summary ?? string.Empty;
+
+    public bool AcceptsSource => Selected is { } row && RepairCommandCatalog.AcceptsSource(row.Command.Id);
+
+    public bool HasSource => Source is not null;
+
+    public string SourceText => Source is { } source ? S.RepairSourceLocal(source.Path, source.Index) : S.RepairSourceDefault;
 
     public static string FormatPercent(double percent) =>
         string.Create(CultureInfo.InvariantCulture, $"{(int)Math.Floor(Math.Clamp(double.IsNaN(percent) ? 0 : percent, 0, RepairProgressParser.Complete))}%");
@@ -145,6 +149,34 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
     {
         _clock.Stop();
         _cancel?.Cancel();
+    }
+
+    public bool UseSource(string? path)
+    {
+        if (RepairSource.TryCreate(path, out RepairSource? source, out RepairSourceProblem problem))
+        {
+            Source = source;
+            SourceProblem = string.Empty;
+            return true;
+        }
+
+        SourceProblem = (path is null ? null : S.RepairSourceRefused(problem)) ?? string.Empty;
+        return false;
+    }
+
+    [RelayCommand]
+    private void ClearSource()
+    {
+        Source = null;
+        SourceProblem = string.Empty;
+    }
+
+    partial void OnSelectedChanged(RepairRow? value)
+    {
+        if (!IsRunning)
+        {
+            Banner.Clear();
+        }
     }
 
     private bool CanRun() => !IsRunning && Selected is not null;
@@ -157,14 +189,12 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
             return;
         }
 
+        RepairSource? source = AcceptsSource ? Source : null;
         Lines.Clear();
-        Lines.Add(new LogLine($"> {row.CommandLine}", LogLineKind.Command));
-        LineAdded?.Invoke();
-        LiveLine = string.Empty;
+        _transcript.Clear();
+        Mirror(_transcript.Echo($"> {SelectedCommandLine}"));
         Percent = 0;
-        Error = null;
-        Warning = null;
-        Result = null;
+        Banner.Clear();
         _started = DateTimeOffset.Now;
         Elapsed = Clock(TimeSpan.Zero);
         IsRunning = true;
@@ -174,7 +204,7 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
         try
         {
             _runner ??= _services.Host.CreateRepairRunner();
-            Show(await _runner.RunAsync(row.Command.Id, new Sink(this), cancel.Token));
+            Show(await _runner.RunAsync(row.Command.Id, source, new Sink(this), cancel.Token));
         }
         finally
         {
@@ -194,45 +224,38 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
             Percent = percent;
         }
 
-        if (!update.IsFinal)
-        {
-            LiveLine = update.Text;
-            return;
-        }
+        Mirror(_transcript.Apply(update));
+    }
 
-        LiveLine = string.Empty;
-        if (update.Text.Length == 0 && Lines.Count > 0 && Lines[^1].Text.Length == 0)
+    private void Mirror(TranscriptChange change)
+    {
+        if (change.Action == TranscriptAction.None)
         {
             return;
         }
 
-        if (Lines.Count >= MaxLines)
+        if (change.Dropped >= 0 && change.Dropped < Lines.Count)
         {
-            Lines.RemoveAt(1);
+            Lines.RemoveAt(change.Dropped);
         }
 
-        Lines.Add(new LogLine(update.Text, update.Stream == RepairStream.Error ? LogLineKind.Error : LogLineKind.Output));
+        TranscriptLine line = change.Line;
+        var shown = new LogLine(line.Text, line.IsCommand ? LogLineKind.Command : line.Stream == RepairStream.Error ? LogLineKind.Error : LogLineKind.Output);
+        if (change.Action == TranscriptAction.Replace && change.Index < Lines.Count)
+        {
+            Lines[change.Index] = shown;
+            return;
+        }
+
+        Lines.Add(shown);
         LineAdded?.Invoke();
     }
 
     private void Show(RepairResult result)
     {
         Elapsed = Clock(result.Elapsed);
-        LiveLine = string.Empty;
         Percent = result.FinalPercent;
-        string text = S.RepairStatus(result, Elapsed);
-        switch (result.Outcome)
-        {
-            case RepairOutcome.Succeeded:
-                Result = text;
-                break;
-            case RepairOutcome.RestartRequired or RepairOutcome.IssuesFound or RepairOutcome.Cancelled:
-                Warning = text;
-                break;
-            default:
-                Error = text;
-                break;
-        }
+        Banner.Show(result, S.RepairStatus(result, Elapsed));
     }
 
     private static string Clock(TimeSpan elapsed) => elapsed.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture);

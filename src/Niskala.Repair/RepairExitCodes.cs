@@ -19,6 +19,7 @@ public enum RepairDiagnostic
     InvalidParameter,
     SourceFilesMissing,
     SourceDownloadFailed,
+    RepairSourceNotFound,
     BlockedByPolicy,
     PendingOperations,
     OfflineRepairNeeded,
@@ -35,6 +36,7 @@ public static class RepairExitCodes
     public const int RestartRequired = 3010;
     public const int SourceFilesMissing = unchecked((int)0x800F081F);
     public const int SourceDownloadFailed = unchecked((int)0x800F0906);
+    public const int RepairSourceNotFound = unchecked((int)0x800F0915);
     public const int BlockedByPolicy = unchecked((int)0x800F0907);
     public const int PendingOperations = unchecked((int)0x800F082F);
 
@@ -65,9 +67,13 @@ public static class RepairExitCodes
             InvalidParameter => (RepairOutcome.Failed, RepairDiagnostic.InvalidParameter),
             SourceFilesMissing => (RepairOutcome.Failed, RepairDiagnostic.SourceFilesMissing),
             SourceDownloadFailed => (RepairOutcome.Failed, RepairDiagnostic.SourceDownloadFailed),
+            RepairSourceNotFound => (RepairOutcome.Failed, RepairDiagnostic.RepairSourceNotFound),
             BlockedByPolicy => (RepairOutcome.Failed, RepairDiagnostic.BlockedByPolicy),
             PendingOperations => (RepairOutcome.Failed, RepairDiagnostic.PendingOperations),
             _ => (RepairOutcome.Failed, RepairDiagnostic.None),
         };
     }
+
+    public static bool NeedsLocalSource(RepairDiagnostic diagnostic) =>
+        diagnostic is RepairDiagnostic.SourceFilesMissing or RepairDiagnostic.SourceDownloadFailed or RepairDiagnostic.RepairSourceNotFound;
 }

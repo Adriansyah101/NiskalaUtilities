@@ -3,11 +3,19 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Niskala.Scanner.Leftovers;
 using Niskala.UI.Services;
+using Niskala.Uninstall.Leftovers;
 
 namespace Niskala.UI.ViewModels;
 
 public enum ReviewTab
 {
+    Files,
+    Registry,
+}
+
+public enum ReviewScope
+{
+    All,
     Files,
     Registry,
 }
@@ -26,6 +34,10 @@ public sealed partial class LeftoverReviewViewModel : ObservableObject
 
     [ObservableProperty]
     public partial ReviewTab Tab { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowTabs), nameof(ShowPermanent), nameof(ScopeTitle))]
+    public partial ReviewScope Scope { get; private set; }
 
     [ObservableProperty]
     public partial bool ShowSafe { get; set; } = true;
@@ -63,21 +75,41 @@ public sealed partial class LeftoverReviewViewModel : ObservableObject
 
     public bool HasSelection => Selected is not null;
 
+    public bool ShowTabs => Scope == ReviewScope.All;
+
+    public bool ShowPermanent => Scope != ReviewScope.Registry;
+
+    public string ScopeTitle => Scope == ReviewScope.Registry ? RegistryTabText : FilesTabText;
+
     public Strings S => Strings.Current;
 
     public IReadOnlyList<LeftoverItem> Checked => [.. _roots.SelectMany(r => r.Chosen())];
 
-    public void Load(IEnumerable<LeftoverItem> items, Func<LeftoverItem, bool> preselect)
+    public void Load(IEnumerable<LeftoverItem> items, Func<LeftoverItem, bool> preselect, ReviewScope scope = ReviewScope.All)
     {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(preselect);
         foreach (LeftoverTreeRow row in Rows(_roots))
         {
             row.PropertyChanged -= OnRowChanged;
         }
 
-        _roots = [.. items.Select(i => Watch(new LeftoverTreeRow(i, LeftoverTree.Root(i), null, preselect(i), ToggleAsync)))];
+        IEnumerable<LeftoverItem> shown = scope switch
+        {
+            ReviewScope.Files => items.Where(i => LeftoverStages.IsFile(i.Kind)),
+            ReviewScope.Registry => items.Where(i => !LeftoverStages.IsFile(i.Kind)),
+            _ => items,
+        };
+        _roots = [.. shown.Select(i => Watch(new LeftoverTreeRow(i, LeftoverTree.Root(i), null, preselect(i), ToggleAsync)))];
+        Scope = scope;
         ShowLow = false;
         Permanent = false;
-        Tab = FileCount > 0 || RegistryCount == 0 ? ReviewTab.Files : ReviewTab.Registry;
+        Tab = scope switch
+        {
+            ReviewScope.Files => ReviewTab.Files,
+            ReviewScope.Registry => ReviewTab.Registry,
+            _ => FileCount > 0 || RegistryCount == 0 ? ReviewTab.Files : ReviewTab.Registry,
+        };
         OnPropertyChanged(string.Empty);
         Refilter();
         UpdateChecked();
@@ -132,7 +164,7 @@ public sealed partial class LeftoverReviewViewModel : ObservableObject
             row.SetChildren([.. children.Nodes.Select(n => Watch(new LeftoverTreeRow(row.Leftover, n, row, inherited, ToggleAsync)))]);
             row.Note = children.Error is { } error ? S.TreeUnreadable(error)
                 : children.Truncated ? S.TreeTruncated(LeftoverTree.MaxChildren)
-                : null;
+                : string.Empty;
         }
 
         row.IsExpanded = true;

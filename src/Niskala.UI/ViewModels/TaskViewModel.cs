@@ -20,10 +20,10 @@ public abstract partial class TaskViewModel : ObservableObject, IDisposable
     public bool IsIdle => !IsBusy;
 
     [ObservableProperty]
-    public partial string? Error { get; set; }
+    public partial string Error { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? Info { get; set; }
+    public partial string Info { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial string? Status { get; set; }
@@ -49,8 +49,8 @@ public abstract partial class TaskViewModel : ObservableObject, IDisposable
         using var cancel = new CancellationTokenSource();
         _cancel = cancel;
         IsBusy = true;
-        Error = null;
-        Info = null;
+        Error = string.Empty;
+        Info = string.Empty;
         try
         {
             await work(cancel.Token);

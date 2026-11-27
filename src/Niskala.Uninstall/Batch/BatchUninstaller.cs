@@ -123,7 +123,13 @@ public sealed class BatchUninstaller(Func<bool, UninstallOrchestrator> orchestra
         return BatchReview.Merge(scans);
     }
 
-    public async Task<IReadOnlyList<CleanResult>> CleanAsync(BatchReview review, IReadOnlyList<LeftoverItem> chosen, CleanOptions options, IProgress<CleanProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CleanResult>> CleanAsync(
+        BatchReview review,
+        IReadOnlyList<LeftoverItem> chosen,
+        CleanOptions options,
+        IProgress<CleanProgress>? progress = null,
+        IReadOnlyDictionary<string, string>? into = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(review);
         ArgumentNullException.ThrowIfNull(chosen);
@@ -131,7 +137,8 @@ public sealed class BatchUninstaller(Func<bool, UninstallOrchestrator> orchestra
         var results = new List<CleanResult>();
         foreach ((BatchItem owner, IReadOnlyList<LeftoverItem> items) in review.ByOwner(chosen))
         {
-            results.Add(await cleaner.CleanAsync(owner.App, owner.Fingerprint!, items, options, progress, cancellationToken).ConfigureAwait(false));
+            CleanOptions applied = options with { Into = into?.GetValueOrDefault(owner.App.Id) };
+            results.Add(await cleaner.CleanAsync(owner.App, owner.Fingerprint!, items, applied, progress, cancellationToken).ConfigureAwait(false));
         }
 
         return results;

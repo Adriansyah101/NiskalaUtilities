@@ -107,7 +107,7 @@ internal static class BatchText
 
         var options = new CleanOptions { Permanent = permanent, CreateRestorePoint = false };
         var transactions = new List<TransactionRecord>();
-        foreach (CleanResult result in await batch.CleanAsync(review, safe, options, new CleanText.Progress(Console.Error), cancellationToken).ConfigureAwait(false))
+        foreach (CleanResult result in await batch.CleanAsync(review, safe, options, new CleanText.Progress(Console.Error), cancellationToken: cancellationToken).ConfigureAwait(false))
         {
             TransactionRecord transaction = await CleanText.OfferEmptyFoldersAsync(cleaner, result, assumeYes, o, cancellationToken).ConfigureAwait(false);
             CleanText.WriteTransaction(o, transaction);

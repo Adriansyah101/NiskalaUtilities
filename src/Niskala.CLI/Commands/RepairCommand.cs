@@ -81,12 +81,17 @@ internal static class RepairCommand
         var name = new Argument<string>("command") { Description = "Repair name, as niskala repair list shows it." };
         var yes = new Option<bool>("--yes", "-y") { Description = "Do not ask before a repair that changes Windows." };
         var json = new Option<bool>("--json") { Description = "Write the result as JSON to stdout; the tool's output goes to stderr." };
-        var command = new Command("run", "Run one repair and show its output and progress as it happens.") { name, yes, json };
+        var sourceOption = new Option<string?>("--source")
+        {
+            Description = "dism-restore-health only: repair from this install.wim or install.esd (image 1) instead of Windows Update.",
+        };
+        var command = new Command("run", "Run one repair and show its output and progress as it happens.") { name, yes, json, sourceOption };
         command.SetAction((parse, cancellationToken) =>
         {
             string requested = parse.GetValue(name)!;
             bool assumeYes = parse.GetValue(yes);
             bool asJson = parse.GetValue(json);
+            string? sourcePath = parse.GetValue(sourceOption);
             return CommandRunner.RunAsync("repair run", parse.GetValue(verbose), async (host, token) =>
             {
                 if (!RepairCommandCatalog.TryFind(requested, out CatalogEntry? repair))
@@ -101,7 +106,23 @@ internal static class RepairCommand
                     return ExitCodes.ElevationRequired;
                 }
 
-                string commandLine = RepairCommandCatalog.Resolve(repair.Id, SystemRepairEnvironment.Instance).CommandLine;
+                RepairSource? source = null;
+                if (sourcePath is not null)
+                {
+                    if (!RepairCommandCatalog.AcceptsSource(repair.Id))
+                    {
+                        await Console.Error.WriteLineAsync($"{repair.Name} takes no --source.").ConfigureAwait(false);
+                        return ExitCodes.Usage;
+                    }
+
+                    if (!RepairSource.TryCreate(sourcePath, out source, out RepairSourceProblem problem))
+                    {
+                        await Console.Error.WriteLineAsync($"{sourcePath} is not a usable repair source: {RepairText.SourceProblem(problem)}").ConfigureAwait(false);
+                        return ExitCodes.Usage;
+                    }
+                }
+
+                string commandLine = RepairCommandCatalog.Resolve(repair.Id, SystemRepairEnvironment.Instance, source).CommandLine;
                 if (repair.ChangesSystem && await Confirmation.RequireAsync($"Run {commandLine}? {RepairText.Summary(repair.Id)}", assumeYes, token).ConfigureAwait(false) is { } declined)
                 {
                     return declined;
@@ -109,7 +130,7 @@ internal static class RepairCommand
 
                 TextWriter output = asJson ? Console.Error : Console.Out;
                 var renderer = new LiveOutput(output, live: !(asJson ? Console.IsErrorRedirected : Console.IsOutputRedirected));
-                RepairResult result = await host.CreateRepairRunner().RunAsync(repair.Id, renderer, token).ConfigureAwait(false);
+                RepairResult result = await host.CreateRepairRunner().RunAsync(repair.Id, source, renderer, token).ConfigureAwait(false);
                 renderer.End();
 
                 if (asJson)
@@ -245,12 +266,22 @@ internal static class RepairText
         RepairDiagnostic.ElevationRequired => "Run niskala from an elevated prompt.",
         RepairDiagnostic.AccessDenied => "Windows denied access to a setting the tool resets.",
         RepairDiagnostic.InvalidParameter => "This Windows version does not know one of the options.",
-        RepairDiagnostic.SourceFilesMissing => "DISM found no repair source; check that Windows Update is reachable.",
-        RepairDiagnostic.SourceDownloadFailed => "DISM could not download the repair files from Windows Update.",
+        RepairDiagnostic.SourceFilesMissing => "DISM found no repair source files (0x800F081F); check the internet connection and Windows Update, or pass --source with install.wim or install.esd from a Windows ISO.",
+        RepairDiagnostic.SourceDownloadFailed => "DISM could not download the repair files from Windows Update; check the internet connection, or pass --source with install.wim or install.esd from a Windows ISO.",
+        RepairDiagnostic.RepairSourceNotFound => "Windows Update could not supply the repair files (0x800F0915); check the internet connection and the Windows Update service, or pass --source with install.wim or install.esd from a Windows ISO.",
         RepairDiagnostic.BlockedByPolicy => "A Group Policy keeps DISM from using Windows Update as a repair source.",
         RepairDiagnostic.PendingOperations => "Windows has servicing operations pending; restart and run it again.",
         RepairDiagnostic.OfflineRepairNeeded => "The volume needs an offline repair; Windows offers it in the drive's properties under Tools.",
         RepairDiagnostic.ProgramMissing => "The program is missing from System32.",
         _ => null,
+    };
+
+    public static string SourceProblem(RepairSourceProblem problem) => problem switch
+    {
+        RepairSourceProblem.NotFullPath => "give the full path on a local drive.",
+        RepairSourceProblem.WrongExtension => "only .wim and .esd images can repair Windows.",
+        RepairSourceProblem.Link => "links are not followed.",
+        RepairSourceProblem.UnsafeCharacters => "the path holds characters DISM cannot take.",
+        _ => "the file was not found.",
     };
 }

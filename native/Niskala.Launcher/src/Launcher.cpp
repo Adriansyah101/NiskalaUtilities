@@ -1,6 +1,8 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include "Splash.h"
+
 #include <algorithm>
 #include <string>
 #include <string_view>
@@ -74,19 +76,41 @@ int WINAPI wWinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ PWSTR, _In_ int sho
 {
     const std::wstring program = ExecutableFolder() + std::wstring(Program);
     const std::wstring arguments(Arguments());
+    const HANDLE ready = CreateEventW(nullptr, FALSE, FALSE, Niskala::SplashReadyEvent);
 
     SHELLEXECUTEINFOW info{};
     info.cbSize = sizeof(info);
-    info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI | SEE_MASK_NOCLOSEPROCESS;
     info.lpFile = program.c_str();
     info.lpParameters = arguments.empty() ? nullptr : arguments.c_str();
     info.nShow = show;
     if (ShellExecuteExW(&info))
     {
+        if (info.hProcess != nullptr)
+        {
+            AllowSetForegroundWindow(GetProcessId(info.hProcess));
+            if (ready != nullptr)
+            {
+                Niskala::RunSplash(ready, info.hProcess);
+            }
+
+            CloseHandle(info.hProcess);
+        }
+
+        if (ready != nullptr)
+        {
+            CloseHandle(ready);
+        }
+
         return 0;
     }
 
     const DWORD error = GetLastError();
+    if (ready != nullptr)
+    {
+        CloseHandle(ready);
+    }
+
     if (error != ERROR_CANCELLED)
     {
         ReportFailure(error, program);

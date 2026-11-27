@@ -65,7 +65,7 @@ public sealed partial class StorageViewModel : TaskViewModel
         }
 
         Show(map.Root);
-        Info = map.Inaccessible + map.Links > 0 ? S.MapSkipped(map.Inaccessible, map.Links) : null;
+        Info = (map.Inaccessible + map.Links > 0 ? S.MapSkipped(map.Inaccessible, map.Links) : null) ?? string.Empty;
     });
 
     [RelayCommand]
@@ -93,7 +93,7 @@ public sealed partial class StorageViewModel : TaskViewModel
         if (row is not null)
         {
             int error = ShellLauncher.ShowItem(row.Node.Path);
-            Error = error == 0 ? null : S.OpenFailed(error);
+            Error = (error == 0 ? null : S.OpenFailed(error)) ?? string.Empty;
         }
     }
 
@@ -273,7 +273,7 @@ public sealed partial class WipeViewModel : TaskViewModel
 
         WipeResult[] failed = [.. results.Where(r => r.Outcome != WipeOutcome.Wiped)];
         Info = S.FilesWiped(results.Length - failed.Length, method);
-        Error = failed.Length == 0 ? null : string.Join(Environment.NewLine, failed.Select(f => $"{Path.GetFileName(f.Path)}: {S.WipeOutcomeText(f.Outcome)} {f.Detail}"));
+        Error = (failed.Length == 0 ? null : string.Join(Environment.NewLine, failed.Select(f => $"{Path.GetFileName(f.Path)}: {S.WipeOutcomeText(f.Outcome)} {f.Detail}"))) ?? string.Empty;
         Percent = 0;
     });
 
@@ -284,8 +284,8 @@ public sealed partial class WipeViewModel : TaskViewModel
         SecureWiper wiper = Services.Host.CreateSecureWiper();
         var progress = new UiProgress<WipeProgress>(Track);
         FreeSpaceResult result = await Task.Run(() => wiper.WipeFreeSpaceAsync(drive, method, null, progress, token), token);
-        Info = result.Outcome == WipeOutcome.Wiped ? S.FreeSpaceWiped(drive, Format.Bytes(result.Bytes), result.Passes) : null;
-        Error = result.Outcome == WipeOutcome.Wiped ? null : $"{S.WipeOutcomeText(result.Outcome)} {result.Detail}";
+        Info = (result.Outcome == WipeOutcome.Wiped ? S.FreeSpaceWiped(drive, Format.Bytes(result.Bytes), result.Passes) : null) ?? string.Empty;
+        Error = (result.Outcome == WipeOutcome.Wiped ? null : $"{S.WipeOutcomeText(result.Outcome)} {result.Detail}") ?? string.Empty;
         Percent = 0;
     });
 

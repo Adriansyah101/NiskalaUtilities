@@ -48,9 +48,23 @@ public sealed partial class RepairPage : UserControl
         }
     }
 
-    private void OnRun(object sender, RoutedEventArgs e)
+    private void OnBannerClosed(InfoBar sender, InfoBarClosedEventArgs args) => ViewModel.Banner.Clear();
+
+    private void OnPickSource(object sender, RoutedEventArgs e) => ViewModel.UseSource(Pickers.RepairImage());
+
+    private void OnRetryWithSource(object sender, RoutedEventArgs e)
     {
-        if (ViewModel.Selected is not { } row)
+        if (ViewModel.UseSource(Pickers.RepairImage()))
+        {
+            Confirm(RunButton);
+        }
+    }
+
+    private void OnRun(object sender, RoutedEventArgs e) => Confirm(RunButton);
+
+    private void Confirm(FrameworkElement anchor)
+    {
+        if (ViewModel.Selected is not { } row || !ViewModel.IsIdle)
         {
             return;
         }
@@ -70,7 +84,7 @@ public sealed partial class RepairPage : UserControl
                 Spacing = 10,
                 Children =
                 {
-                    new TextBlock { Text = Strings.Current.RepairConfirm(row.Name, row.CommandLine, row.Command.NeedsRestart), TextWrapping = TextWrapping.Wrap },
+                    new TextBlock { Text = Strings.Current.RepairConfirm(row.Name, ViewModel.SelectedCommandLine, row.Command.NeedsRestart), TextWrapping = TextWrapping.Wrap },
                     confirm,
                 },
             },
@@ -80,6 +94,6 @@ public sealed partial class RepairPage : UserControl
             flyout.Hide();
             ViewModel.RunCommand.Execute(null);
         };
-        flyout.ShowAt(RunButton, new FlyoutShowOptions { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight });
+        flyout.ShowAt(anchor, new FlyoutShowOptions { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight });
     }
 }

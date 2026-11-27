@@ -80,10 +80,10 @@ public sealed partial class TrackerViewModel : ObservableObject
     public partial TextList Kept { get; set; } = [];
 
     [ObservableProperty]
-    public partial string? Result { get; set; }
+    public partial string Result { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? Error { get; set; }
+    public partial string Error { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
@@ -145,8 +145,8 @@ public sealed partial class TrackerViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRecord))]
     private async Task RecordAsync()
     {
-        Error = null;
-        Result = null;
+        Error = string.Empty;
+        Result = string.Empty;
         Processes.Clear();
         IsRecording = true;
         Stage = S.TrackerStarting;
@@ -202,8 +202,8 @@ public sealed partial class TrackerViewModel : ObservableObject
             return;
         }
 
-        Error = null;
-        Result = null;
+        Error = string.Empty;
+        Result = string.Empty;
         IsBusy = true;
         try
         {

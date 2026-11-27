@@ -68,13 +68,21 @@ public static class RepairCommandCatalog
         return command is not null;
     }
 
-    public static RepairInvocation Resolve(RepairCommandId id, IRepairEnvironment environment)
+    public static bool AcceptsSource(RepairCommandId id) => id == RepairCommandId.DismRestoreHealth;
+
+    public static RepairInvocation Resolve(RepairCommandId id, IRepairEnvironment environment, RepairSource? source = null)
     {
         ArgumentNullException.ThrowIfNull(environment);
+        if (source is not null && !AcceptsSource(id))
+        {
+            throw new ArgumentException($"{Get(id).Name} takes no repair source.", nameof(source));
+        }
+
         string system = environment.SystemDirectory;
         return id switch
         {
             RepairCommandId.DismCheckHealth => new(system, Dism, [Online, CleanupImage, "/CheckHealth"]),
+            RepairCommandId.DismRestoreHealth when source is not null => new(system, Dism, [Online, CleanupImage, "/RestoreHealth", source.Argument, RepairSource.OfflineSwitch]),
             RepairCommandId.DismRestoreHealth => new(system, Dism, [Online, CleanupImage, "/RestoreHealth"]),
             RepairCommandId.SfcScanNow => new(system, Sfc, ["/scannow"]),
             RepairCommandId.DismComponentCleanup => new(system, Dism, [Online, CleanupImage, "/StartComponentCleanup"]),

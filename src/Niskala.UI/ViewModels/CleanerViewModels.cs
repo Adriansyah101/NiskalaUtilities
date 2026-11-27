@@ -87,7 +87,7 @@ public sealed partial class QuickScanViewModel : TaskViewModel
     public partial string StartupTotal { get; set; } = "—";
 
     [ObservableProperty]
-    public partial string? Locked { get; set; }
+    public partial string Locked { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanClean))]
@@ -119,7 +119,7 @@ public sealed partial class QuickScanViewModel : TaskViewModel
         SystemTotal = Format.Bytes(report.SystemBytes);
         BrowserTotal = Format.Bytes(report.BrowserBytes);
         StartupTotal = Format.Number(report.Startup.Count);
-        Locked = report.LockedBrowsers.Count > 0 ? S.CloseBrowsers(report.LockedBrowsers) : null;
+        Locked = (report.LockedBrowsers.Count > 0 ? S.CloseBrowsers(report.LockedBrowsers) : null) ?? string.Empty;
         HasResults = true;
         OnPropertyChanged(nameof(CanClean));
     });
@@ -137,7 +137,7 @@ public sealed partial class QuickScanViewModel : TaskViewModel
 
     internal async Task SwitchOffAsync(HindranceRow row)
     {
-        Error = null;
+        Error = string.Empty;
         ResourceControl control = Services.Host.CreateResourceControl();
         ResourceChange? change = await Task.Run(() => control.List().FirstOrDefault(i => i.Id == row.Hindrance.Id) is { } item ? control.SetEnabled(item, enabled: false) : null);
         if (change is { Succeeded: true })

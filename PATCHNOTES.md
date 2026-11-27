@@ -2,6 +2,25 @@
 
 Changes in each release of Niskala Utilities, newest first.
 
+## v0.2.0 (2026-11-27)
+
+### Changed
+
+- **Leftovers in two steps.** The uninstall panel now has six steps: Fingerprint, Restore point, Live process tree, Leftover scan, Leftover files and Leftover registry. **Leftover files** lists only files and folders, with the Safe, Review and Low filters, **Select shown** and **Clear shown**, the details beside the list and the option to delete permanently; **Clean files & continue** removes the chosen ones and **Skip files** keeps them. **Leftover registry** then lists registry keys, values and firewall rules with their path, value, confidence and the reasons they were found; **Clean registry** removes the chosen ones and **Finish without deleting** leaves them. With no leftover files the panel goes straight to the registry, and with nothing left at all it says so and finishes.
+- Both steps write to one entry in **History & backups**, so a restore brings back the files and the registry entries together.
+- **Safe cancel and a locked panel.** Until the app itself is uninstalled, **Cancel**, the close button, a click beside the panel, `Esc` or another page in the rail cancels the uninstall and closes the panel. Once it is uninstalled, the close button goes away, clicks beside the panel and `Esc` are ignored, and the rail and `Ctrl+K` stay locked, with a note in the panel, until the leftover steps are cleaned or skipped.
+- **Smoother start.** The splash fades in, the mark and the name slide gently into place, and it waits until the main window has drawn its first page before one short fade-out, so the window appears whole. The background, the mark and the name fade together.
+- **System Repair output.** A progress line that a tool rewrites in place, such as DISM's bar or the percentages of `sfc` and `chkdsk`, now updates one line in the log instead of adding a copy for every step.
+- **One status banner.** System Repair shows a single green, yellow or red banner for the last run, never an empty one, and clears it when another repair is chosen or started.
+
+### Added
+
+- **Local repair source.** **Repair the component store** can use `install.wim` or `install.esd` from a Windows ISO instead of Windows Update. When DISM stops with `0x800F0915` or `0x800F081F`, the banner explains in English or Indonesian that the repair files could not be found or downloaded, and offers to choose an image and run again. The command line gets `niskala repair run dism-restore-health --source <image>`.
+
+### Fixed
+
+- Hovering over the rail, the System Repair list or any button no longer shows a floating `Ctrl+K` tooltip; the shortcut still opens the command palette and the badge in the title bar search box stays.
+
 ## v0.1.3 (2026-11-27)
 
 ### Added

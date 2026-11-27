@@ -98,12 +98,20 @@ public sealed partial class NavigationViewModel : ObservableObject
 
     public event Action<Section>? Shown;
 
+    public Func<Section, bool>? CanLeave { get; set; }
+
     public NavCategoryCollection Categories { get; } = [];
 
     public NavPage Updates { get; }
 
     [ObservableProperty]
     public partial Section Selected { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsUnlocked))]
+    public partial bool IsLocked { get; set; }
+
+    public bool IsUnlocked => !IsLocked;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCompact), nameof(PaneWidth))]
@@ -117,21 +125,27 @@ public sealed partial class NavigationViewModel : ObservableObject
 
     public NavPage Page(Section section) => Pages.First(p => p.Section == section);
 
-    public void Select(Section section)
+    public bool Select(Section section)
     {
         NavPage page = Page(section);
-        if (page.Category is { } category)
-        {
-            category.IsExpanded = true;
-        }
-
         if (page.IsSelected)
         {
-            return;
+            if (page.Category is { } current)
+            {
+                current.IsExpanded = true;
+            }
+
+            return true;
+        }
+
+        if (IsLocked || CanLeave?.Invoke(section) == false)
+        {
+            return false;
         }
 
         Mark(page);
         Shown?.Invoke(section);
+        return true;
     }
 
     public void Toggle(NavCategory category) => category.IsExpanded = !category.IsExpanded;

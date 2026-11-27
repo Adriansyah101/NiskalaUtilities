@@ -17,7 +17,10 @@ public sealed record RollbackPlan(
     IReadOnlyList<ValueRevert> Reverts,
     IReadOnlyList<string> Kept,
     int Gone,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings)
+{
+    public IReadOnlyList<string> Roots { get; init; } = [];
+}
 
 public sealed class LogRollback(LeftoverCleaner cleaner, InstallLogStore logs, ISystemState state, ILogger<LogRollback> logger, TimeProvider? time = null)
 {
@@ -108,7 +111,10 @@ public sealed class LogRollback(LeftoverCleaner cleaner, InstallLogStore logs, I
         kept.AddRange(log.Files.Where(f => f.Change == ChangeKind.Deleted).Select(f => $"{f.Path}: deleted by the install"));
         kept.AddRange(log.Keys.Where(k => k.Change == ChangeKind.Deleted).Select(k => $"{k.Path}: deleted by the install"));
 
-        return new RollbackPlan(log, items, reverts, kept, gone, Warnings(log));
+        return new RollbackPlan(log, items, reverts, kept, gone, Warnings(log))
+        {
+            Roots = [.. items.Where(i => i.Kind == LeftoverKind.Folder).Select(i => i.Path)],
+        };
     }
 
     public async Task<CleanResult> ExecuteAsync(RollbackPlan plan, CleanOptions options, IProgress<CleanProgress>? progress = null, CancellationToken cancellationToken = default)
@@ -129,7 +135,7 @@ public sealed class LogRollback(LeftoverCleaner cleaner, InstallLogStore logs, I
         {
             AppId = app.Id,
             TakenAt = log.FinishedAt ?? log.StartedAt,
-            Roots = [.. plan.Items.Where(i => i.Kind == LeftoverKind.Folder).Select(i => i.Path)],
+            Roots = plan.Roots.Count > 0 ? plan.Roots : [.. plan.Items.Where(i => i.Kind == LeftoverKind.Folder).Select(i => i.Path)],
         };
 
         CleanResult result = await cleaner.CleanAsync(

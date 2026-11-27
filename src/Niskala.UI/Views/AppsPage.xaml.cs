@@ -34,6 +34,14 @@ public sealed partial class AppsPage : UserControl
         }
     }
 
+    private void OnPaneClosing(SplitView sender, SplitViewPaneClosingEventArgs args)
+    {
+        if (ViewModel.Inspector.Gate.Request(FlowExit.Backdrop) == FlowExitResult.Refuse)
+        {
+            args.Cancel = true;
+        }
+    }
+
     private void SizePane()
     {
         double room = Math.Max(NarrowPane, ActualWidth - PaneGap);

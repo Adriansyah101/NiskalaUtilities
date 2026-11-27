@@ -69,7 +69,7 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
     public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
-    public partial string? Error { get; set; }
+    public partial string Error { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial string Summary { get; set; } = string.Empty;
@@ -128,7 +128,7 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
         }
 
         IsLoading = true;
-        Error = null;
+        Error = string.Empty;
         try
         {
             InventorySnapshot snapshot = await Task.Run(() => _services.Host.CreateInventoryCollector().Collect());

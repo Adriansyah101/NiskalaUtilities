@@ -95,10 +95,28 @@ public sealed partial class Strings
     public string NoUninstallCommand => T("No uninstall command", "Tidak ada perintah uninstall");
     public string FinishRunningFirst => T("Another removal is still running; finish it first.", "Penghapusan lain masih berjalan; selesaikan dulu.");
 
-    public string StepFingerprint => T("Fingerprint", "Sidik jari");
+    public string StepFingerprint => T("Fingerprint", "Jejak aplikasi");
     public string StepRestorePoint => T("Restore point", "Titik pemulihan");
-    public string StepProcessTree => T("Live process tree", "Pohon proses live");
+    public string StepProcessTree => T("Live process tree", "Proses aktif");
     public string StepScan => T("Leftover scan", "Pindai sisa");
+    public string StepFiles => T("Leftover files", "Berkas sisa");
+    public string StepRegistry => T("Leftover registry", "Registri sisa");
+    public string CleanFilesContinue => T("Clean files & continue", "Hapus berkas & lanjut");
+    public string SkipFiles => T("Skip files", "Lewati berkas");
+    public string CleanRegistry => T("Clean registry", "Hapus registri");
+    public string FinishWithoutDeleting => T("Finish without deleting", "Selesai tanpa menghapus");
+    public string ChooseFiles => T("Choose which files and folders go.", "Pilih berkas dan folder yang dihapus.");
+    public string ChooseRegistry => T("Choose which registry entries and firewall rules go.", "Pilih entri registri dan aturan firewall yang dihapus.");
+    public string FilesKept => T("Files and folders kept.", "Berkas dan folder dibiarkan.");
+    public string RegistryKept => T("Registry and firewall left unchanged.", "Registri dan firewall tidak diubah.");
+    public string NoLeftoverFiles => T("No leftover files or folders.", "Tidak ada berkas atau folder sisa.");
+    public string NoLeftoverRegistry => T("No leftover registry entries or firewall rules.", "Tidak ada entri registri atau aturan firewall sisa.");
+    public string NoLeftovers => T("No leftovers were found; the app is removed completely.", "Tidak ada sisa yang ditemukan; aplikasi sudah terhapus bersih.");
+    public string LockNotice => T("The app is uninstalled. Clean or skip its leftover files and registry entries to unlock navigation.", "Aplikasi sudah dicopot. Bersihkan atau lewati berkas dan registri sisanya untuk membuka kembali navigasi.");
+    public string FlowCancelled => T("Cancelled; nothing was removed.", "Dibatalkan; tidak ada yang dihapus.");
+    public string RegistryPath => T("Registry path", "Jalur registri");
+    public string FilePath => T("Location", "Lokasi");
+    public string ValueName => T("Value name", "Nama nilai");
     public string StepReview => T("Review & clean", "Tinjau & bersihkan");
     public string StepFingerprintScan => T("Fingerprint & scan", "Sidik jari & pindai");
     public string StepStopProcesses => T("Stop processes & services", "Hentikan proses & layanan");
@@ -224,6 +242,26 @@ public sealed partial class Strings
     public string RepairSubtitle => T("Windows' own repair tools from a fixed list; none of them deletes user data or removes update uninstall points.", "Alat perbaikan bawaan Windows dari daftar tetap; tidak ada yang menghapus data pengguna atau titik uninstall pembaruan.");
     public string RepairRun => T("Run", "Jalankan");
     public string RepairIdle => T("Pick a repair and run it; its output appears here as it happens.", "Pilih perbaikan lalu jalankan; keluarannya muncul di sini secara langsung.");
+    public string RepairSourceTitle => T("Repair source", "Sumber perbaikan");
+    public string RepairSourceDefault => T("Windows Update (default)", "Windows Update (bawaan)");
+    public string RepairSourceHint => T("Optional. Choose install.wim or install.esd from a Windows ISO of the same version and edition when Windows Update cannot supply the files; Windows Update is then not used.", "Opsional. Pilih install.wim atau install.esd dari ISO Windows dengan versi dan edisi yang sama bila Windows Update tidak dapat menyediakan berkasnya; Windows Update lalu tidak dipakai.");
+    public string RepairSourceBrowse => T("Choose install.wim or install.esd…", "Pilih install.wim atau install.esd…");
+    public string RepairSourceClear => T("Use Windows Update", "Pakai Windows Update");
+    public string RepairSourceRetry => T("Choose a local source and retry", "Pilih sumber lokal lalu ulangi");
+    public string PickRepairSourceTitle => T("Choose a Windows image", "Pilih image Windows");
+    public string WindowsImages => T("Windows images (*.wim;*.esd)", "Image Windows (*.wim;*.esd)");
+
+    public string RepairSourceLocal(string path, int index) =>
+        T($"{path} · image {index} · Windows Update is not used", $"{path} · image {index} · Windows Update tidak dipakai");
+
+    public string RepairSourceRefused(RepairSourceProblem problem) => problem switch
+    {
+        RepairSourceProblem.NotFullPath => T("Choose an image on a local drive.", "Pilih image di drive lokal."),
+        RepairSourceProblem.WrongExtension => T("Only .wim and .esd images can repair Windows.", "Hanya image .wim dan .esd yang bisa memperbaiki Windows."),
+        RepairSourceProblem.Link => T("Links are not followed; choose the image itself.", "Tautan tidak diikuti; pilih image-nya langsung."),
+        RepairSourceProblem.UnsafeCharacters => T("The path holds characters DISM cannot take.", "Jalurnya memuat karakter yang tidak dapat diterima DISM."),
+        _ => T("The image was not found.", "Image tidak ditemukan."),
+    };
     public string RepairChangesSystem => T("Changes Windows", "Mengubah Windows");
     public string RepairNeedsRestart => T("Restart afterwards", "Perlu mulai ulang");
     public string RepairLongRunning => T("Can take a long time", "Bisa lama");
@@ -587,8 +625,15 @@ public sealed partial class Strings
         RepairDiagnostic.ElevationRequired => T("Run Niskala as administrator.", "Jalankan Niskala sebagai administrator."),
         RepairDiagnostic.AccessDenied => T("Windows denied access to a setting the tool resets.", "Windows menolak akses ke pengaturan yang disetel ulang."),
         RepairDiagnostic.InvalidParameter => T("This Windows version does not know one of the options.", "Versi Windows ini tidak mengenal salah satu opsinya."),
-        RepairDiagnostic.SourceFilesMissing => T("DISM found no repair source; check that Windows Update is reachable.", "DISM tidak menemukan sumber perbaikan; pastikan Windows Update bisa dijangkau."),
-        RepairDiagnostic.SourceDownloadFailed => T("DISM could not download the repair files from Windows Update.", "DISM tidak bisa mengunduh berkas perbaikan dari Windows Update."),
+        RepairDiagnostic.SourceFilesMissing => T(
+            "DISM found no repair source files (0x800F081F). Check the internet connection and the Windows Update service, or choose install.wim or install.esd from a Windows ISO as a local repair source.",
+            "DISM tidak menemukan berkas sumber perbaikan (0x800F081F). Periksa koneksi internet dan layanan Windows Update, atau pilih install.wim atau install.esd dari ISO Windows sebagai sumber perbaikan lokal."),
+        RepairDiagnostic.SourceDownloadFailed => T(
+            "DISM could not download the repair files from Windows Update. Check the internet connection, or choose install.wim or install.esd from a Windows ISO as a local repair source.",
+            "DISM tidak bisa mengunduh berkas perbaikan dari Windows Update. Periksa koneksi internet, atau pilih install.wim atau install.esd dari ISO Windows sebagai sumber perbaikan lokal."),
+        RepairDiagnostic.RepairSourceNotFound => T(
+            "Windows Update could not supply the repair files (0x800F0915): they were not found or could not be downloaded. Check the internet connection and the Windows Update service, or choose install.wim or install.esd from a Windows ISO as a local repair source.",
+            "Windows Update tidak dapat menyediakan berkas perbaikan (0x800F0915): berkasnya tidak ditemukan atau tidak dapat diunduh. Periksa koneksi internet dan layanan Windows Update, atau pilih install.wim atau install.esd dari ISO Windows sebagai sumber perbaikan lokal."),
         RepairDiagnostic.BlockedByPolicy => T("A Group Policy keeps DISM from using Windows Update as a repair source.", "Group Policy mencegah DISM memakai Windows Update sebagai sumber perbaikan."),
         RepairDiagnostic.PendingOperations => T("Windows has servicing operations pending; restart and run it again.", "Windows punya operasi servis tertunda; mulai ulang lalu jalankan lagi."),
         RepairDiagnostic.OfflineRepairNeeded => T("The drive needs an offline repair; Windows offers it in the drive's properties under Tools.", "Drive perlu perbaikan offline; Windows menyediakannya di properti drive, tab Tools."),
