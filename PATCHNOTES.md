@@ -2,6 +2,13 @@
 
 Changes in each release of Niskala Utilities, newest first.
 
+## v0.1.3 (2026-11-27)
+
+### Added
+
+- **Update prompt.** When the check at start finds a newer release, a dialog shows this copy's version, the new one and the first items of its release notes. **Update now** opens Updates and starts the download, checksum check and install; **Review first** opens Updates with the update button ready; **Later** closes it for this session and the dot on Updates stays. It waits until the window is ready and no other dialog, menu or removal is open, and speaks English and Indonesian.
+- **Sidebar motion.** A category's pages slide open and shut, the highlight pill and the marker on the guide line move to the new page, a pressed item gives a small press, and the menu button folds the rail smoothly. A quick second click turns a motion around at once, and with Windows' animation effects off every change is instant.
+
 ## v0.1.2 (2026-11-27)
 
 ### Changed

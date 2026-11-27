@@ -103,6 +103,10 @@ public sealed class UiServices : IDisposable
 
     public NavigationViewModel Navigation { get; } = new();
 
+    public bool IsBusy =>
+        Apps.Inspector.IsBusy || Apps.Inspector.ShowScrim || Repair.IsRunning || Tracker.IsRecording || Tracker.IsBusy || Updates.IsDownloading ||
+        ((TaskViewModel[])[QuickScan, SelectiveClean, Integrity, Resources, Suspend, Storage, Duplicates, Wipe]).Any(t => t.IsBusy);
+
     public void Navigate(Section section) => Navigation.Select(section);
 
     public void ToggleTheme() => ThemeToggleRequested?.Invoke();

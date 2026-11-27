@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Animation;
 using Niskala.UI.Services;
 using Niskala.UI.ViewModels;
 using Windows.System;
@@ -14,17 +16,21 @@ public sealed partial class ShellView : UserControl
 
     private readonly UiServices _services;
     private readonly Dictionary<Section, UIElement> _pages = [];
+    private Storyboard? _paneMotion;
 
     public ShellView(UiServices services)
     {
         _services = services;
         InitializeComponent();
         LabelThemeButton();
+        Pane.Width = Nav.PaneWidth;
         Nav.Shown += Show;
+        Nav.PropertyChanged += OnNavChanged;
         services.ThemeToggleRequested += LabelThemeButton;
         Unloaded += (_, _) =>
         {
             Nav.Shown -= Show;
+            Nav.PropertyChanged -= OnNavChanged;
             services.ThemeToggleRequested -= LabelThemeButton;
         };
         Show(Nav.Selected);
@@ -39,6 +45,42 @@ public sealed partial class ShellView : UserControl
     public UpdatesViewModel Updates => _services.Updates;
 
     private void OnPaneToggleClick(object sender, RoutedEventArgs e) => Nav.TogglePane();
+
+    private void OnNavChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(NavigationViewModel.PaneWidth))
+        {
+            ResizePane();
+        }
+    }
+
+    private void ResizePane()
+    {
+        double from = Pane.ActualWidth > 0 ? Pane.ActualWidth : Pane.Width;
+        double to = Nav.PaneWidth;
+        _paneMotion?.Stop();
+        _paneMotion = null;
+        TimeSpan duration = NavMotion.Remaining(from, to, NavigationViewModel.OpenPaneWidth - NavigationViewModel.CompactPaneWidth, NavMotion.Pane, IsLoaded && Motion.Enabled);
+        if (duration == TimeSpan.Zero)
+        {
+            Pane.Width = to;
+            return;
+        }
+
+        Pane.Width = from;
+        Storyboard motion = new Storyboard().Tween(Pane, nameof(Width), from, to, duration);
+        motion.Completed += (_, _) =>
+        {
+            if (_paneMotion == motion)
+            {
+                _paneMotion = null;
+                motion.Stop();
+                Pane.Width = to;
+            }
+        };
+        _paneMotion = motion;
+        motion.Begin();
+    }
 
     private void OnCategoryClick(object sender, RoutedEventArgs e)
     {

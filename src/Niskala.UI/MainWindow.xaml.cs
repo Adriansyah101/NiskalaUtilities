@@ -5,12 +5,16 @@ using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using Niskala.Interop.Desktop;
 using Niskala.UI.Services;
+using Niskala.UI.ViewModels;
 using Niskala.UI.Views;
 using Windows.Graphics;
 using Windows.System;
 using Windows.UI;
+using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
 
 namespace Niskala.UI;
 
@@ -21,9 +25,16 @@ public sealed partial class MainWindow : Window
     private const int MinimumWidth = 960;
     private const int MinimumHeight = 640;
 
+    private static readonly TimeSpan PromptRetry = TimeSpan.FromMilliseconds(750);
+    private static readonly TimeSpan ScrimFade = TimeSpan.FromMilliseconds(160);
+
     private readonly App _app;
     private readonly UiServices _services;
     private readonly OverlappedPresenter _presenter = OverlappedPresenter.Create();
+    private readonly DispatcherQueueTimer _promptTimer;
+    private bool _hidden;
+    private bool _prompting;
+    private Storyboard? _scrimMotion;
 
     public MainWindow(App app, UiServices services)
     {
@@ -61,8 +72,13 @@ public sealed partial class MainWindow : Window
         Root.SizeChanged += (_, _) => UpdatePassthrough();
         services.ThemeToggleRequested += ToggleTheme;
         services.LanguageToggleRequested += ToggleLanguage;
+        _promptTimer = DispatcherQueue.CreateTimer();
+        _promptTimer.Interval = PromptRetry;
+        _promptTimer.Tick += (_, _) => TryPrompt();
+        services.Updates.OfferReady += TryPrompt;
         services.MainWindowHidden += hidden =>
         {
+            _hidden = hidden;
             if (hidden)
             {
                 _presenter.Minimize();
@@ -102,6 +118,73 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnLauncherClick(object sender, RoutedEventArgs e) => _services.Palette.Open();
+
+    private async void TryPrompt()
+    {
+        UpdatePrompt prompt = _services.Updates.Prompt;
+        if (_prompting || prompt.Pending is null)
+        {
+            _promptTimer.Stop();
+            return;
+        }
+
+        bool ready = Root.XamlRoot is not null && Root.IsLoaded;
+        int popups = ready ? VisualTreeHelper.GetOpenPopupsForXamlRoot(Root.XamlRoot).Count : 0;
+        if (!UpdatePrompt.CanShow(ready, _hidden, popups, _services.IsBusy))
+        {
+            _promptTimer.Start();
+            return;
+        }
+
+        _promptTimer.Stop();
+        if (prompt.Take() is not { } offer)
+        {
+            return;
+        }
+
+        _prompting = true;
+        Dim(true);
+        try
+        {
+            _services.Updates.Respond(await UpdateOfferView.AskAsync(Root.XamlRoot!, _app.Theme, offer));
+        }
+        finally
+        {
+            Dim(false);
+            _prompting = false;
+        }
+    }
+
+    private void Dim(bool on)
+    {
+        double from = DialogScrim.Visibility == Visibility.Visible ? DialogScrim.Opacity : 0;
+        double to = on ? 1 : 0;
+        _scrimMotion?.Stop();
+        _scrimMotion = null;
+        TimeSpan duration = NavMotion.Remaining(from, to, 1, ScrimFade, Motion.Enabled);
+        if (duration == TimeSpan.Zero)
+        {
+            DialogScrim.Opacity = 1;
+            DialogScrim.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            return;
+        }
+
+        DialogScrim.Opacity = from;
+        DialogScrim.Visibility = Visibility.Visible;
+        Storyboard fade = new Storyboard().Tween(DialogScrim, nameof(UIElement.Opacity), from, to, duration);
+        fade.Completed += (_, _) =>
+        {
+            if (_scrimMotion == fade)
+            {
+                _scrimMotion = null;
+                fade.Stop();
+                DialogScrim.Opacity = 1;
+                DialogScrim.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            }
+        };
+        _scrimMotion = fade;
+        fade.Begin();
+    }
 
     private void ToggleTheme()
     {

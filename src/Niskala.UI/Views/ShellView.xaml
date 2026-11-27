@@ -22,60 +22,105 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="views:NavButton">
-            <Grid x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
-              <Border x:Name="ActiveFill" Background="{ThemeResource NiskalaAccentSoftBrush}" Opacity="0" />
-              <Border x:Name="OpenFill" Background="{ThemeResource NiskalaNavOpenBrush}" Opacity="0" />
-              <Border x:Name="HoverFill" Background="{ThemeResource NiskalaNavHoverBrush}" Opacity="0" />
-              <Grid Padding="{TemplateBinding Padding}" ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="16" />
-                  <ColumnDefinition x:Name="LabelColumn" Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <FontIcon x:Name="Icon" Glyph="{TemplateBinding Glyph}" FontSize="16" Foreground="{ThemeResource NiskalaMutedBrush}" />
-                <TextBlock x:Name="Text" Grid.Column="1" Text="{TemplateBinding Label}" FontSize="{TemplateBinding FontSize}" FontWeight="{TemplateBinding FontWeight}"
-                           Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                <FontIcon x:Name="Trailing" Grid.Column="2" Glyph="{TemplateBinding TrailingGlyph}" FontSize="10" Foreground="{ThemeResource NiskalaFaintBrush}" />
+            <Grid x:Name="Root" Background="Transparent">
+              <Rectangle x:Name="GuideLine" Width="1" Margin="0.5,0,0,0" HorizontalAlignment="Left" Fill="{ThemeResource NiskalaNavGuideBrush}" Visibility="Collapsed" />
+              <Rectangle x:Name="Indicator" Width="2" Margin="0,9" HorizontalAlignment="Left" RadiusX="1" RadiusY="1" Fill="{ThemeResource NiskalaAccentBrush}"
+                         Opacity="0" Visibility="Collapsed" RenderTransformOrigin="0.5,0.5">
+                <Rectangle.RenderTransform>
+                  <ScaleTransform x:Name="IndicatorScale" ScaleY="0.2" />
+                </Rectangle.RenderTransform>
+              </Rectangle>
+              <Grid x:Name="Pill" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                <Border x:Name="ActiveFill" Background="{ThemeResource NiskalaAccentSoftBrush}" Opacity="0" />
+                <Border x:Name="OpenFill" Background="{ThemeResource NiskalaNavOpenBrush}" Opacity="0" />
+                <Border x:Name="HoverFill" Background="{ThemeResource NiskalaNavHoverBrush}" Opacity="0" />
+                <Grid Padding="{TemplateBinding Padding}" ColumnSpacing="12">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition x:Name="LabelColumn" Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <FontIcon x:Name="Icon" Glyph="{TemplateBinding Glyph}" FontSize="16" Foreground="{ThemeResource NiskalaMutedBrush}" />
+                  <TextBlock x:Name="Text" Grid.Column="1" Text="{TemplateBinding Label}" FontSize="{TemplateBinding FontSize}" FontWeight="{TemplateBinding FontWeight}"
+                             Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                  <FontIcon x:Name="Trailing" Grid.Column="2" Glyph="{TemplateBinding TrailingGlyph}" FontSize="10" Foreground="{ThemeResource NiskalaFaintBrush}" />
+                </Grid>
               </Grid>
               <VisualStateManager.VisualStateGroups>
                 <VisualStateGroup x:Name="CommonStates">
+                  <VisualStateGroup.Transitions>
+                    <VisualTransition GeneratedDuration="0:0:0.083" />
+                  </VisualStateGroup.Transitions>
                   <VisualState x:Name="Normal" />
                   <VisualState x:Name="PointerOver">
-                    <VisualState.Setters>
-                      <Setter Target="HoverFill.Opacity" Value="1" />
-                    </VisualState.Setters>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="HoverFill" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                    </Storyboard>
                   </VisualState>
                   <VisualState x:Name="Pressed">
                     <VisualState.Setters>
-                      <Setter Target="HoverFill.Opacity" Value="1" />
                       <Setter Target="HoverFill.Background" Value="{ThemeResource NiskalaNavPressedBrush}" />
                     </VisualState.Setters>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="HoverFill" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                    </Storyboard>
                   </VisualState>
                   <VisualState x:Name="Disabled" />
                 </VisualStateGroup>
                 <VisualStateGroup x:Name="EmphasisStates">
+                  <VisualStateGroup.Transitions>
+                    <VisualTransition GeneratedDuration="0:0:0.18">
+                      <VisualTransition.GeneratedEasingFunction>
+                        <CubicEase EasingMode="EaseOut" />
+                      </VisualTransition.GeneratedEasingFunction>
+                    </VisualTransition>
+                  </VisualStateGroup.Transitions>
                   <VisualState x:Name="Plain" />
                   <VisualState x:Name="Open">
                     <VisualState.Setters>
-                      <Setter Target="OpenFill.Opacity" Value="1" />
                       <Setter Target="Icon.Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
                     </VisualState.Setters>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="OpenFill" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                    </Storyboard>
                   </VisualState>
                   <VisualState x:Name="Active">
                     <VisualState.Setters>
-                      <Setter Target="ActiveFill.Opacity" Value="1" />
                       <Setter Target="Icon.Foreground" Value="{ThemeResource NiskalaAccentBrush}" />
                       <Setter Target="Text.Foreground" Value="{ThemeResource NiskalaAccentBrush}" />
                     </VisualState.Setters>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="ActiveFill" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                      <DoubleAnimation Storyboard.TargetName="Indicator" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                      <DoubleAnimation Storyboard.TargetName="IndicatorScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0" />
+                    </Storyboard>
                   </VisualState>
                 </VisualStateGroup>
                 <VisualStateGroup x:Name="WidthStates">
+                  <VisualStateGroup.Transitions>
+                    <VisualTransition From="Compact" To="Full">
+                      <Storyboard>
+                        <DoubleAnimation Storyboard.TargetName="Text" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.24" />
+                        <DoubleAnimation Storyboard.TargetName="Trailing" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.24" />
+                      </Storyboard>
+                    </VisualTransition>
+                  </VisualStateGroup.Transitions>
                   <VisualState x:Name="Full" />
                   <VisualState x:Name="Compact">
                     <VisualState.Setters>
                       <Setter Target="Text.Visibility" Value="Collapsed" />
                       <Setter Target="Trailing.Visibility" Value="Collapsed" />
                       <Setter Target="LabelColumn.Width" Value="0" />
+                    </VisualState.Setters>
+                  </VisualState>
+                </VisualStateGroup>
+                <VisualStateGroup x:Name="GuideStates">
+                  <VisualState x:Name="NoGuide" />
+                  <VisualState x:Name="Guide">
+                    <VisualState.Setters>
+                      <Setter Target="GuideLine.Visibility" Value="Visible" />
+                      <Setter Target="Indicator.Visibility" Value="Visible" />
+                      <Setter Target="Pill.Margin" Value="11,1,0,1" />
                     </VisualState.Setters>
                   </VisualState>
                 </VisualStateGroup>
@@ -87,9 +132,11 @@
     </Style>
 
     <Style x:Key="NavPageStyle" TargetType="views:NavButton" BasedOn="{StaticResource NavButtonStyle}">
-      <Setter Property="Height" Value="32" />
+      <Setter Property="Height" Value="34" />
       <Setter Property="CornerRadius" Value="16" />
       <Setter Property="Padding" Value="10,0,10,0" />
+      <Setter Property="HasGuide" Value="True" />
+      <Setter Property="FocusVisualMargin" Value="10,0,-1,0" />
     </Style>
   </UserControl.Resources>
 
@@ -99,7 +146,7 @@
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
-    <Grid x:Name="Pane" Width="{x:Bind Nav.PaneWidth, Mode=OneWay}" Padding="8,6,8,8" RowSpacing="6">
+    <Grid x:Name="Pane" Padding="8,6,8,8" RowSpacing="6">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
@@ -122,22 +169,16 @@
                 <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="{x:Bind Glyph}" Label="{x:Bind Title, Mode=OneWay}" FontWeight="SemiBold"
                                  TrailingGlyph="{x:Bind Chevron, Mode=OneWay}" IsActive="{x:Bind IsActive, Mode=OneWay}" IsOpen="{x:Bind IsOpen, Mode=OneWay}"
                                  IsCompact="{x:Bind IsCompact, Mode=OneWay}" Click="OnCategoryClick" />
-                <ItemsControl ItemsSource="{x:Bind Pages}" Margin="19,2,0,4" IsTabStop="False" Visibility="{x:Bind services:Format.Visible(ShowPages), Mode=OneWay}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:NavPage">
-                      <Grid ColumnSpacing="9">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="2" />
-                          <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Rectangle Width="1" Fill="{ThemeResource NiskalaNavGuideBrush}" />
-                        <Rectangle Width="2" Margin="0,8" RadiusX="1" RadiusY="1" Fill="{ThemeResource NiskalaAccentBrush}" Visibility="{x:Bind services:Format.Visible(IsSelected), Mode=OneWay}" />
-                        <views:NavButton Grid.Column="1" Margin="0,1" Style="{StaticResource NavPageStyle}" Glyph="{x:Bind Glyph}" Label="{x:Bind Title, Mode=OneWay}"
+                <views:Accordion IsExpanded="{x:Bind ShowPages, Mode=OneWay}">
+                  <ItemsControl ItemsSource="{x:Bind Pages}" Margin="19,2,0,4" IsTabStop="False">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:NavPage">
+                        <views:NavButton Style="{StaticResource NavPageStyle}" Glyph="{x:Bind Glyph}" Label="{x:Bind Title, Mode=OneWay}"
                                          IsActive="{x:Bind IsSelected, Mode=OneWay}" Click="OnPageClick" />
-                      </Grid>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </views:Accordion>
               </StackPanel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

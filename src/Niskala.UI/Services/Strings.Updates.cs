@@ -10,6 +10,18 @@ public sealed partial class Strings
         "Niskala membaca rilis GitHub-nya dan memasang versi baru hanya setelah checksum SHA-256-nya cocok dengan SHA256SUMS.txt.");
     public string UpdateThisCopy => T("This copy", "Salinan ini");
     public string UpdateLatestLabel => T("Latest release", "Rilis terbaru");
+    public string UpdateNow => T("Update now", "Perbarui sekarang");
+    public string UpdateReview => T("Review first", "Tinjau dulu");
+    public string UpdateLater => T("Later", "Nanti");
+    public string UpdatePromptIntro => T(
+        "A newer release is on GitHub. Updating downloads it, checks it against SHA256SUMS.txt and installs it.",
+        "Rilis yang lebih baru ada di GitHub. Pembaruan mengunduhnya, mencocokkannya dengan SHA256SUMS.txt, lalu memasangnya.");
+    public string UpdatePromptNoNotes => T("This release has no notes on GitHub.", "Rilis ini tidak punya catatan di GitHub.");
+    public string UpdatePromptTitle(string latest) => T($"Niskala Utilities {latest} is available", $"Niskala Utilities {latest} tersedia");
+    public string UpdatePromptWhatsNew(string latest) => T($"What's new in v{latest}", $"Yang baru di v{latest}");
+    public string UpdatePromptMore(int count) => T(
+        count == 1 ? "and 1 more change on the Updates page" : $"and {count} more changes on the Updates page",
+        $"dan {count} perubahan lain di halaman Pembaruan");
     public string UpdateCheck => T("Check for updates", "Periksa Pembaruan");
     public string UpdateAutoCheck => T("Check when Niskala opens", "Periksa saat Niskala dibuka");
     public string UpdateNotesTitle => T("Release notes", "Catatan rilis");

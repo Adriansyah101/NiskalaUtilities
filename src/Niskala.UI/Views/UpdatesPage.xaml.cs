@@ -1,3 +1,4 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Niskala.UI.ViewModels;
 
@@ -9,7 +10,24 @@ public sealed partial class UpdatesPage : UserControl
     {
         ViewModel = viewModel;
         InitializeComponent();
+        Loaded += (_, _) =>
+        {
+            viewModel.ReviewRequested += FocusApply;
+            FocusApply();
+        };
+        Unloaded += (_, _) => viewModel.ReviewRequested -= FocusApply;
     }
 
     public UpdatesViewModel ViewModel { get; }
+
+    private void FocusApply()
+    {
+        if (!ViewModel.TakeReview())
+        {
+            return;
+        }
+
+        ApplyButton.StartBringIntoView();
+        ApplyButton.Focus(FocusState.Keyboard);
+    }
 }

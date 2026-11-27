@@ -38,6 +38,9 @@
           <SolidColorBrush x:Key="NiskalaNavOpenBrush" Color="#10FFFFFF" />
           <SolidColorBrush x:Key="NiskalaNavGuideBrush" Color="#343846" />
           <SolidColorBrush x:Key="NiskalaScrimBrush" Color="#A6000000" />
+          <SolidColorBrush x:Key="ContentDialogBackground" Color="#121317" />
+          <SolidColorBrush x:Key="ContentDialogTopOverlay" Color="#191B21" />
+          <SolidColorBrush x:Key="ContentDialogBorderBrush" Color="#25272F" />
 
           <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="#09090B" />
           <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#16171C" />
@@ -82,6 +85,9 @@
           <SolidColorBrush x:Key="NiskalaNavOpenBrush" Color="#0B000000" />
           <SolidColorBrush x:Key="NiskalaNavGuideBrush" Color="#C9CDD8" />
           <SolidColorBrush x:Key="NiskalaScrimBrush" Color="#590B192C" />
+          <SolidColorBrush x:Key="ContentDialogBackground" Color="#F5F6F8" />
+          <SolidColorBrush x:Key="ContentDialogTopOverlay" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="ContentDialogBorderBrush" Color="#E2E4EA" />
 
           <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="#F5F6F8" />
           <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#FFFFFF" />

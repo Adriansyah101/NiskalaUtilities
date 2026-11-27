@@ -48,5 +48,7 @@
     </Grid>
 
     <Border x:Name="Host" Grid.Row="1" />
+
+    <Rectangle x:Name="DialogScrim" Grid.RowSpan="2" Fill="{ThemeResource NiskalaScrimBrush}" Visibility="Collapsed" />
   </Grid>
 </Window>

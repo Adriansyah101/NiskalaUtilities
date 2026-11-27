@@ -23,7 +23,15 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
         ShowNotes();
     }
 
+    public event Action? OfferReady;
+
+    public event Action? ReviewRequested;
+
     public Strings S => Strings.Current;
+
+    public UpdatePrompt Prompt { get; } = new();
+
+    public bool ReviewPending { get; private set; }
 
     public string CurrentVersion => UpdateService.CurrentVersion.ToString();
 
@@ -89,6 +97,32 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
         {
             _ = RunCheckAsync(quiet: true);
         }
+    }
+
+    public void Respond(UpdatePromptChoice choice)
+    {
+        Prompt.Close(choice);
+        if (choice == UpdatePromptChoice.Later)
+        {
+            return;
+        }
+
+        _services.Navigate(Section.Updates);
+        if (choice == UpdatePromptChoice.UpdateNow && ApplyCommand.CanExecute(null))
+        {
+            ApplyCommand.Execute(null);
+            return;
+        }
+
+        ReviewPending = true;
+        ReviewRequested?.Invoke();
+    }
+
+    public bool TakeReview()
+    {
+        bool pending = ReviewPending;
+        ReviewPending = false;
+        return pending;
     }
 
     public void Relabel()
@@ -190,6 +224,11 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
             if (check.IsAvailable && !IsAvailable)
             {
                 Error = S.UpdateIncomplete;
+            }
+
+            if (Prompt.Offer(check, automatic: quiet, IsAvailable))
+            {
+                OfferReady?.Invoke();
             }
         }
         catch (Exception ex) when (Describe(ex) is { } text)

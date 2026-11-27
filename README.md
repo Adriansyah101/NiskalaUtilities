@@ -14,7 +14,7 @@ analysed or reused.
 One engine, two front ends: `niskala.exe`, a command line, and `Niskala.exe`, a WinUI 3 desktop
 app. Both are Native AOT builds (`win-x64`, `win-arm64`). The product name is Niskala Utilities;
 namespaces, file names, the `.nsklog` extension and `%LocalAppData%\Niskala` keep the short name.
-This is an early release: version 0.1.2. Released under the GNU General Public License v3.0; see
+This is an early release: version 0.1.3. Released under the GNU General Public License v3.0; see
 [License](#license).
 
 ## Modules
@@ -163,7 +163,7 @@ first failure:
 6. **Privacy scan.** Every shipped file is searched as ASCII and as UTF-16 for the user name, the
    machine name, the profile path and the repository path. Any hit fails the build.
 7. **Installer.** `ISCC.exe` compiles `installer/NiskalaUtilities.iss` from both payloads into
-   `NiskalaUtilities-Setup-v0.1.2-win-x64.exe` (LZMA2 ultra64, solid). It installs to
+   `NiskalaUtilities-Setup-v0.1.3-win-x64.exe` (LZMA2 ultra64, solid). It installs to
    `%ProgramFiles%\Niskala Utilities` with the desktop app at the root, the optional command line
    in `cli\` (its own `niskala.exe` and `lib\`, since the two names collide), a Start menu
    shortcut, an optional desktop shortcut and an optional `PATH` entry for `cli\`, which the
@@ -174,7 +174,7 @@ first failure:
 8. **Archives.** Each payload is zipped with its folder at the root by
    `scripts/New-ReleaseArchive.cs` (`dotnet run --file`, `CompressionLevel.SmallestSize`; Windows
    PowerShell 5.1 runs on .NET Framework, which lacks that level):
-   `NiskalaUtilities-v0.1.2-win-x64.zip` and `NiskalaUtilities-CLI-v0.1.2-win-x64.zip`.
+   `NiskalaUtilities-v0.1.3-win-x64.zip` and `NiskalaUtilities-CLI-v0.1.3-win-x64.zip`.
    `SHA256SUMS.txt` lists the installer and the two zips in `sha256sum -c` format, and the build
    fails if `artifacts/release` holds any other file. Upload it with
    every release: the updater refuses a release without it.
@@ -316,8 +316,14 @@ guide line that marks the page on screen. With every category open the rail stil
 window without a scroll bar. Folded, a category's icon lists its pages in a menu. Updates, theme and
 language sit in its footer. `Ctrl+K` (or the search box in the title bar) opens a command palette that
 finds apps and runs force removal, Target Picker, restore and the rest; a page opened from there, or
-from another page, opens its category and highlights itself. The rail is `NavigationViewModel` (state)
-and `NavButton` (a templated `Button` with Active, Open and Compact states). The default theme is a dark slate
+from another page, opens its category and highlights itself. The rail is `NavigationViewModel` (state),
+`NavButton` (a templated `Button` with Active, Open, Compact and Guide states) and `Accordion` (the
+page list). It moves: a category's pages slide open and shut (height and opacity, 220 ms), the pill
+and the marker on the guide line fade and grow into the new page (180 ms), a pressed item shrinks to
+96 % and springs back, and the menu button folds the rail's width (240 ms) while the labels fade back
+in. A click during a motion turns it around from where it is, in the share of the time that is left,
+so nothing waits for an animation to end. With Windows' "Animation effects" off
+(`UISettings.AnimationsEnabled`), every change is instant. The timing is `NavMotion`. The default theme is a dark slate
 (`#09090b` / `#121317`); a light theme and English or Indonesian are one click away in the rail
 and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:Bind}`.
 
@@ -635,7 +641,7 @@ The Updates page (the rail's footer, or Ctrl+K) and `niskala update` share `Nisk
 1. **Check.** `GET https://api.github.com/repos/Adriansyah101/NiskalaUtilities/releases/latest`
    with `User-Agent: NiskalaUtilities/<version>`, read through a source-generated
    `JsonSerializerContext`. Drafts, pre-releases and pre-release tags are skipped; a `404` means no
-   release yet. The tag (`v0.1.2` or `V0.1.2`) is compared with the running version by semantic
+   release yet. The tag (`v0.1.3` or `V0.1.3`) is compared with the running version by semantic
    versioning precedence. Only assets named exactly for that version and runtime and served from
    `github.com` count: `NiskalaUtilities-Setup-v<version>-<rid>.exe`,
    `NiskalaUtilities-v<version>-<rid>.zip`, `NiskalaUtilities-CLI-v<version>-<rid>.zip` and
@@ -654,7 +660,14 @@ The Updates page (the rail's footer, or Ctrl+K) and `niskala update` share `Nisk
    never over it), and Explorer shows it.
 
 The desktop app checks when it opens unless "Check when Niskala opens" is off
-(`skipUpdateCheck` in `ui-settings.json`); an update shows as a dot on the rail item.
+(`skipUpdateCheck` in `ui-settings.json`); an update shows as a dot on the rail item. When that
+check finds a newer release with a package for this copy and `SHA256SUMS.txt`, a dialog over a
+dimmed window (themed `ContentDialog`) names this copy's version and the new one and lists the first
+four items of the release notes. **Update now** opens Updates and starts the download, checksum
+check and install; **Review first** opens Updates with the update button focused; **Later** (or Esc)
+closes it, and the dot stays. It appears once per session, only after the main window is shown and
+visible, and waits while a palette, menu or other dialog is open or a removal, cleaning, repair,
+recording or download is running. A check started by hand never opens it (`UpdatePrompt`).
 
 The page's release notes come from `PATCHNOTES.md`, which `Niskala.Updater` embeds as a resource
 (a release also carries it as `lib\PATCHNOTES.md`, the fallback), so an installed and a portable
