@@ -29,7 +29,7 @@ public sealed class BoundCollectionTests
                 typeof(ResourceRowCollection), typeof(SuspendRowCollection), typeof(StorageRowCollection),
                 typeof(ExtensionRowCollection), typeof(DuplicateRowCollection), typeof(PathCollection),
                 typeof(RepairRowCollection), typeof(LogLineCollection),
-                typeof(TransactionItemCollection), typeof(PaletteEntryCollection),
+                typeof(TransactionItemCollection), typeof(PaletteEntryCollection), typeof(NoteRowCollection),
                 typeof(TextList), typeof(ReasonList), typeof(ChangeList), typeof(RecordList),
             },
             BoundCollections,

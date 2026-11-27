@@ -60,7 +60,10 @@
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Border Width="36" Height="36" CornerRadius="8" Background="{ThemeResource NiskalaPlateBrush}" VerticalAlignment="Top">
-                  <FontIcon Glyph="{x:Bind Glyph}" FontSize="15" Foreground="{ThemeResource NiskalaMutedBrush}" />
+                  <Grid>
+                    <FontIcon Glyph="{x:Bind Glyph}" FontSize="15" Foreground="{ThemeResource NiskalaMutedBrush}" Visibility="{x:Bind services:Format.Collapsed(HasIcon), Mode=OneWay}" />
+                    <Image Source="{x:Bind Icon, Mode=OneWay}" Width="24" Height="24" />
+                  </Grid>
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="2">
                   <TextBlock Text="{x:Bind Name}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />

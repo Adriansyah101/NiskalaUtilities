@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Niskala.UI.Views.UpdatesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:Niskala.UI.ViewModels"
+    xmlns:services="using:Niskala.UI.Services">
+  <Grid Padding="28,4,28,20" RowSpacing="14">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <StackPanel>
+      <TextBlock Text="{x:Bind ViewModel.S.NavUpdates}" Style="{StaticResource PageTitleStyle}" />
+      <TextBlock Text="{x:Bind ViewModel.S.UpdateSubtitle}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="1" Spacing="8">
+      <InfoBar Severity="Error" IsClosable="True" Message="{x:Bind ViewModel.Error, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Error), Mode=OneWay}" />
+      <InfoBar Severity="Success" IsClosable="True" Message="{x:Bind ViewModel.Result, Mode=OneWay}" IsOpen="{x:Bind services:Format.HasText(ViewModel.Result), Mode=OneWay}" />
+    </StackPanel>
+
+    <Grid Grid.Row="2" ColumnSpacing="14">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="340" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Border Style="{StaticResource CardStyle}" VerticalAlignment="Top">
+        <StackPanel Spacing="14">
+          <StackPanel Spacing="2">
+            <TextBlock Text="{x:Bind ViewModel.S.UpdateThisCopy}" Style="{StaticResource SectionLabelStyle}" />
+            <TextBlock Text="{x:Bind ViewModel.CurrentVersion}" FontSize="28" FontWeight="SemiBold" />
+            <TextBlock Text="{x:Bind ViewModel.Copy, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <Rectangle Height="1" Fill="{ThemeResource NiskalaStrokeBrush}" />
+
+          <StackPanel Spacing="2">
+            <TextBlock Text="{x:Bind ViewModel.S.UpdateLatestLabel}" Style="{StaticResource SectionLabelStyle}" />
+            <TextBlock Text="{x:Bind ViewModel.Latest, Mode=OneWay}" FontSize="28" FontWeight="SemiBold" />
+            <TextBlock Text="{x:Bind ViewModel.Status, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Command="{x:Bind ViewModel.CheckCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE895;" FontSize="13" />
+                <TextBlock Text="{x:Bind ViewModel.S.UpdateCheck}" />
+              </StackPanel>
+            </Button>
+            <ProgressRing IsActive="{x:Bind ViewModel.IsChecking, Mode=OneWay}" Width="18" Height="18" />
+          </StackPanel>
+
+          <ToggleSwitch Header="{x:Bind ViewModel.S.UpdateAutoCheck}" IsOn="{x:Bind ViewModel.AutoCheck, Mode=TwoWay}" />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+        <Grid RowSpacing="12">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+
+          <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{x:Bind ViewModel.S.UpdateNotesTitle}" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="16" VerticalAlignment="Center" />
+            <HyperlinkButton Grid.Column="1" Content="{x:Bind ViewModel.S.UpdateOpenPage}" Command="{x:Bind ViewModel.OpenPageCommand}"
+                             Visibility="{x:Bind services:Format.VisibleText(ViewModel.Page), Mode=OneWay}" />
+          </Grid>
+
+          <Border Grid.Row="1" CornerRadius="8" Background="{ThemeResource NiskalaBackgroundBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1">
+            <Grid>
+              <ScrollViewer Padding="16,12">
+                <ItemsControl ItemsSource="{x:Bind ViewModel.NoteRows}" IsTabStop="False">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:NoteRow">
+                      <Grid Margin="{x:Bind Spacing}">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind Marker}" MinWidth="16" Margin="0,0,6,0" Foreground="{ThemeResource NiskalaAccentBrush}"
+                                   Visibility="{x:Bind services:Format.Visible(HasMarker)}" />
+                        <TextBlock Grid.Column="1" Text="{x:Bind Text}" FontSize="{x:Bind Size}" FontWeight="{x:Bind Weight}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+              <TextBlock Text="{x:Bind ViewModel.S.UpdateNoNotes}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Visibility="{x:Bind services:Format.Empty(ViewModel.NoteRows.Count), Mode=OneWay}" />
+            </Grid>
+          </Border>
+
+          <StackPanel Grid.Row="2" Spacing="6" Visibility="{x:Bind services:Format.VisibleText(ViewModel.Progress), Mode=OneWay}">
+            <ProgressBar Maximum="100" Value="{x:Bind ViewModel.Percent, Mode=OneWay}" />
+            <TextBlock Text="{x:Bind ViewModel.Progress, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+
+          <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Content="{x:Bind ViewModel.S.Cancel}" Command="{x:Bind ViewModel.CancelCommand}" />
+            <Button Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.ApplyCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE896;" FontSize="13" />
+                <TextBlock Text="{x:Bind ViewModel.ApplyLabel, Mode=OneWay}" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

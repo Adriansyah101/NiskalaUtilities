@@ -14,7 +14,7 @@ analysed or reused.
 One engine, two front ends: `niskala.exe`, a command line, and `Niskala.exe`, a WinUI 3 desktop
 app. Both are Native AOT builds (`win-x64`, `win-arm64`). The product name is Niskala Utilities;
 namespaces, file names, the `.nsklog` extension and `%LocalAppData%\Niskala` keep the short name.
-This is an early release: version 0.1.0. Released under the GNU General Public License v3.0; see
+This is an early release: version 0.1.1. Released under the GNU General Public License v3.0; see
 [License](#license).
 
 ## Modules
@@ -28,6 +28,7 @@ This is an early release: version 0.1.0. Released under the GNU General Public L
 | Process Suspend | Freezing, efficiency mode and CPU caps for idle background processes. |
 | Storage Map, Duplicate Scan, Secure Wipe | The maintenance toolkit. |
 | System Repair | DISM, SFC, network resets, DNS flush and an online disk scan from a closed list. |
+| Updates | Checks the GitHub releases and installs a new version once its SHA-256 checksum matches. |
 
 All of them ship in this release.
 
@@ -45,6 +46,7 @@ All of them ship in this release.
 | `src/Niskala.Cleaner` | Quick Scan, Selective Clean and Registry Integrity: the rule catalog, browser profiles and their locks, SQLite compaction, the cleaner and the registry checks. |
 | `src/Niskala.Optimizer` | Resource Control (startup, services, tasks, context menus, boot impact) and Process Suspend. |
 | `src/Niskala.Toolkit` | Storage Map, Duplicate Scan and Secure Wipe. |
+| `src/Niskala.Updater` | Updates: the GitHub release client, semantic versions, `SHA256SUMS.txt`, the verified downloader, install-mode detection and the update launcher. |
 | `rules/*.json` | The cleaning rules; a release carries them in `lib\rules\`. |
 | `native/Niskala.EtwHelper` | C++20 DLL (MSVC v143) that runs the real-time ETW session and follows the process tree; a small C ABI for `Niskala.Interop`. |
 | `native/Niskala.Launcher` | C++20 launcher (MSVC v143) shipped as the release's root `Niskala.exe`; it starts the desktop app in `lib\`. |
@@ -52,12 +54,15 @@ All of them ship in this release.
 | `src/Niskala.Host` | Composition root shared by the CLI and the UI. |
 | `src/Niskala.UI` | WinUI 3, unpackaged, self-contained, Native AOT, `requireAdministrator`. |
 | `tests/*` | xunit v3 on Microsoft.Testing.Platform. |
-| `scripts/Build-Release.ps1` | Release build: tests, Native AOT publish, launcher, `lib\` layout, privacy scan, zips and checksums. |
+| `scripts/Build-Release.ps1` | Release build: tests, Native AOT publish, launcher, `lib\` layout, privacy scan, installer, zips and checksums. |
+| `PATCHNOTES.md` | Changes per release; embedded in `Niskala.Updater` and copied to `lib\PATCHNOTES.md`. |
+| `scripts/New-ReleaseArchive.cs` | File-based .NET program that writes the release zips with `CompressionLevel.SmallestSize`. |
+| `installer/NiskalaUtilities.iss` | Inno Setup script for `NiskalaUtilities-Setup-v<version>-<rid>.exe`. |
 | `scripts/New-AppIcon.ps1` | Renders `assets/niskala.ico` (16 to 256 px) from the monogram geometry in `NiskalaMark.xaml`. |
 | `LICENSE` | GNU General Public License v3.0; a release carries it in `lib\LICENSE`. |
 
 Dependencies point one way: `UI`/`CLI` -> `Host` -> `Uninstall`, `Tracker`, `Cleaner`, `Optimizer` and `Toolkit` -> `Guardian` ->
-`Scanner` -> `Core` -> `Interop`; `Host` -> `Repair` -> `Core`. The Quick Scan reads startup items
+`Scanner` -> `Core` -> `Interop`; `Host` -> `Repair` -> `Core`; `Host` -> `Updater` -> `Interop`. The Quick Scan reads startup items
 through `IStartupReview`, which the host implements with Resource Control, so the cleaner does not
 depend on the optimizer.
 
@@ -109,7 +114,14 @@ powershell -ExecutionPolicy Bypass -File scripts\Build-Release.ps1 [-Runtime win
 ```
 
 The version (`Version`, `AssemblyVersion`, `FileVersion`, `InformationalVersion`) comes from
-`Directory.Build.props`; the launcher's version resource takes it from there as well. The script
+`Directory.Build.props`; the launcher's version resource and the installer take it from there as
+well. Both front ends publish with `OptimizationPreference=Size`, `IlcTrimMetadata=true` and
+`StackTraceSupport=false`, so a crash log carries no method names. The desktop app references the
+Windows App SDK's WinUI package rather than the whole SDK, which keeps the AI, machine learning,
+search and widget runtimes out of `lib\`. The installer needs Inno Setup 6 or 7 (`ISCC.exe`); the
+script finds it on `PATH`, through its Uninstall entry or in the usual program folders, and without
+it builds the zips alone and says how to install it
+(`winget install --id JRSoftware.InnoSetup -e`). The script
 first empties `artifacts/release`, so zips of an older version never linger, and stops at the
 first failure:
 
@@ -131,9 +143,15 @@ first failure:
      desktop app (`lib\Niskala.exe`), the self-contained Windows App SDK runtime, its resources and
      `Niskala.EtwHelper.dll`.
 
-   Both payloads get the repository's `rules/*.json` in `lib\rules\` and its `LICENSE` in
-   `lib\LICENSE`; the published `niskala.exe` then loads the rules (`clean rules --json`) and the
-   build stops if it cannot.
+   Every executable must carry `assets/niskala.ico` and the expected `FileDescription`:
+   `Niskala Utilities` for the launcher and the desktop app, `Niskala Utilities CLI` for
+   `niskala.exe`, `Niskala Utilities Setup` for the installer.
+
+   Both payloads get the repository's `rules/*.json` in `lib\rules\`, its `LICENSE` in
+   `lib\LICENSE` and its `PATCHNOTES.md` in `lib\PATCHNOTES.md`; the published `niskala.exe`
+   then loads the rules (`clean rules --json`) and the build stops if it cannot. Any language folder in `lib\` other than those in
+   `SatelliteResourceLanguages` (`en-US`, `id-ID`) is removed, and a `.pdb` left in a payload
+   stops the build.
 
    The launcher starts `lib\Niskala.exe` with the same arguments through `ShellExecuteEx`, so the
    app's `requireAdministrator` manifest raises the usual UAC prompt, and exits. The app keeps its
@@ -144,9 +162,22 @@ first failure:
    paths in them, so they stay on the build machine for crash analysis and never ship.
 6. **Privacy scan.** Every shipped file is searched as ASCII and as UTF-16 for the user name, the
    machine name, the profile path and the repository path. Any hit fails the build.
-7. **Archives.** Each payload is zipped with its folder at the root:
-   `NiskalaUtilities-v0.1.0-win-x64.zip` and `NiskalaUtilities-CLI-v0.1.0-win-x64.zip`.
-   `SHA256SUMS.txt` lists the zips in `sha256sum -c` format.
+7. **Installer.** `ISCC.exe` compiles `installer/NiskalaUtilities.iss` from both payloads into
+   `NiskalaUtilities-Setup-v0.1.1-win-x64.exe` (LZMA2 ultra64, solid). It installs to
+   `%ProgramFiles%\Niskala Utilities` with the desktop app at the root, the optional command line
+   in `cli\` (its own `niskala.exe` and `lib\`, since the two names collide), a Start menu
+   shortcut, an optional desktop shortcut and an optional `PATH` entry for `cli\`, which the
+   uninstaller takes out again. The license is shown before installing. `CloseApplications` and
+   `RestartApplications` let an update replace a running copy; a silent run with
+   `/RESTARTAPPLICATIONS` starts Niskala again when it is done. The installer is privacy-scanned and
+   version-checked like the executables.
+8. **Archives.** Each payload is zipped with its folder at the root by
+   `scripts/New-ReleaseArchive.cs` (`dotnet run --file`, `CompressionLevel.SmallestSize`; Windows
+   PowerShell 5.1 runs on .NET Framework, which lacks that level):
+   `NiskalaUtilities-v0.1.1-win-x64.zip` and `NiskalaUtilities-CLI-v0.1.1-win-x64.zip`.
+   `SHA256SUMS.txt` lists the installer and the two zips in `sha256sum -c` format, and the build
+   fails if `artifacts/release` holds any other file. Upload it with
+   every release: the updater refuses a release without it.
 
 The program folder the user unpacked counts as Niskala's own: PathGuard protects `lib\` and the
 folder above it.
@@ -171,6 +202,7 @@ ARM64 builds need the MSVC ARM64 build tools as well.
 | `repair` | List the System Repair commands or run one, with its output and progress live (elevated). |
 | `optimize` | Resource Control: list and switch startup entries, services, tasks and context-menu handlers. Process Suspend: list processes, suspend, efficiency mode, CPU cap, resume. |
 | `toolkit` | Storage Map, Duplicate Scan, Secure Wipe of files and of free space. |
+| `update` | Check GitHub for a newer release, or download, verify and install it. |
 
 ```
 niskala list [--json] [--all] [--source all|win32|store] [--no-msi-index]
@@ -203,6 +235,8 @@ niskala toolkit map <folder> [--depth <n>] [--top <n>] [--json]
 niskala toolkit duplicates <folder>... [--min-size <bytes>] [--hidden] [--keep Oldest|Newest] [--remove] [--dry-run] [--permanent] [--yes] [--json]
 niskala toolkit wipe <file>... [--method ZeroFill|Dod522022M|Gutmann] [--dry-run] [--yes] [--json]
 niskala toolkit wipe-free <drive> [--method ZeroFill|Dod522022M|Gutmann] [--dry-run] [--yes] [--json]
+niskala update check [--json]
+niskala update install [--dry-run] [--yes] [--json]
 ```
 
 Every command that changes something has `--dry-run`, asks before it acts (`--yes` skips the
@@ -274,8 +308,9 @@ and `UTILITIES` fade in and rise (0.55 to 1 s), and the card fades out once the 
 ready (from 1.15 s). Everything is XAML: the monogram is one vector control (`NiskalaMark`) shared
 by the splash and the title bar, animated by storyboards; no image file is loaded. The executables
 carry `assets/niskala.ico` (16 to 256 px), and the main window takes its icon from that resource.
-A left rail holds thirteen sections in four groups (Apps, Cleaning, Performance, Maintenance);
-`Ctrl+K` (or the search box in the title bar) opens a command palette that finds apps and runs
+A left rail, open and docked at start (320 px, folded by its menu button), holds thirteen sections
+in four groups (Apps, Cleaning, Performance, Maintenance) with Updates, theme and language in its
+footer; `Ctrl+K` (or the search box in the title bar) opens a command palette that finds apps and runs
 force removal, Target Picker, restore and the rest. The default theme is a dark slate
 (`#09090b` / `#121317`); a light theme and English or Indonesian are one click away in the rail
 and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:Bind}`.
@@ -322,9 +357,12 @@ and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:
 - **Registry Integrity.** Scan, then every issue with its kind, key and what is missing; protected
   ones are shown but cannot be checked. Repair selected asks first.
 - **Resource Control.** Four tabs (Startup, Services, Scheduled tasks, Context menu). Each row shows
-  the command, publisher, where it starts, the boot-impact estimate and a switch; a protected row
-  says why and cannot be switched. Run and Startup-folder entries can also be removed as a
-  journaled transaction.
+  the program's own icon, the command, publisher, where it starts, the boot-impact estimate and a
+  switch; a protected row says why and cannot be switched. Run and Startup-folder entries can also
+  be removed as a journaled transaction. Icons come from the icon resources embedded in the
+  program (`.exe`) or handler (`.dll`), cached as 256 px PNG files in
+  `%LocalAppData%\Niskala\icons\files`; a program without an embedded icon keeps the symbol of its
+  kind rather than the shell's generic file icon.
 - **Process Suspend.** Processes of this session with their CPU use over 1.5 s, by default only the
   idle background ones that may be touched; Suspend, Efficiency mode, Limit CPU to 20% and Resume on
   each row, Resume all at the top. Refused processes say why.
@@ -337,8 +375,11 @@ and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:
 
   Every page is locked to the window height; only its lists scroll.
 - **System Repair.** The repair list on the left; on the right the selected command line, Run and
-  Cancel, a progress bar fed by the parsed percentage (indeterminate until the tool prints one), the
-  elapsed time, the line the tool is redrawing, and a log that follows the newest line. The page is
+  Cancel, a progress bar from 0 to 100 fed by the parsed percentage with the number beside it
+  (`42%`), the elapsed time, the line the tool is redrawing, and a log that follows the newest line.
+  A tool that prints no percentage (ipconfig, netsh) goes from 0% to 100% when it finishes. A run
+  that ends normally says `Finished · 0:00:48` (`Selesai · 0:00:48`) with no exit code; only a
+  failure says what went wrong, and an exit code appears only when no plainer reason is known. The page is
   locked to the window height; only the list and the log scroll. A repair that changes Windows asks
   first, and only one runs at a time.
 - **History & backups.** Every Guardian transaction with its items, restore point and method, and
@@ -384,7 +425,10 @@ across chunks intact. A `\r` makes the next character start the line over, so `s
 progress arrives as updates of one line and only its last state stays in the log; `\r\r\n`
 keeps the text. The percentage is the last `0` to `100` number followed by `%` in a line, with a
 point or a comma as decimal separator and an optional space before `%`, so `Total: 5%` wins in
-chkdsk's line.
+chkdsk's line (`Kemajuan: ... Tahap: 18%; Total: 5%` on an Indonesian Windows). A line that a pipe
+read cut short (no `\r` or `\n` after it yet) is shown at once, but its percentage counts only after
+a finished line has shown how many percentages a full line carries, so a chkdsk line cut after
+`Stage: 18%` never moves the bar to the stage value.
 
 Cancelling kills the process and its children (`Process.Kill(entireProcessTree: true)`), waits for
 the exit, and returns `Cancelled`; the process object and its pipes are disposed in every case. Exit
@@ -576,6 +620,42 @@ local drive: it creates a new folder at the drive's root, fills the free space w
 files until the drive is full, rewrites them for every further pass and deletes the folder, also
 when cancelled. Solid-state drives remap blocks, so neither kind of wipe can promise that an old
 copy in a spare block is gone; the CLI and the page say so.
+
+## Updates
+
+The Updates page (the rail's footer, or Ctrl+K) and `niskala update` share `Niskala.Updater`:
+
+1. **Check.** `GET https://api.github.com/repos/Adriansyah101/NiskalaUtilities/releases/latest`
+   with `User-Agent: NiskalaUtilities/<version>`, read through a source-generated
+   `JsonSerializerContext`. Drafts, pre-releases and pre-release tags are skipped; a `404` means no
+   release yet. The tag (`v0.1.1` or `V0.1.1`) is compared with the running version by semantic
+   versioning precedence. Only assets named exactly for that version and runtime and served from
+   `github.com` count: `NiskalaUtilities-Setup-v<version>-<rid>.exe`,
+   `NiskalaUtilities-v<version>-<rid>.zip`, `NiskalaUtilities-CLI-v<version>-<rid>.zip` and
+   `SHA256SUMS.txt`.
+2. **Install mode.** A copy is installed when it runs inside the folder named by the installer's
+   Uninstall entry (`HKLM\...\Uninstall\{3EC397E4-E199-4B2F-B436-8F7D0FC248B9}_is1`,
+   `InstallLocation`), or when `unins???.exe` with its `.dat` sits in its folder or up to two
+   levels above. Anything else is portable.
+3. **Download.** `SHA256SUMS.txt` is read first (at most 64 KB); a package it does not list is never
+   downloaded. The package goes to a new `%TEMP%\niskala-update-*` folder with byte and percent
+   progress and is hashed while it arrives. A wrong hash or length deletes it.
+4. **Apply.** The hash is checked once more before the file is used. An installed copy runs the
+   installer with `/VERYSILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS` and the desktop app closes;
+   the installer starts it again (the command line passes `/NORESTARTAPPLICATIONS` instead). A
+   portable copy gets the zip of its own kind in Downloads (next to an older file of the same name,
+   never over it), and Explorer shows it.
+
+The desktop app checks when it opens unless "Check when Niskala opens" is off
+(`skipUpdateCheck` in `ui-settings.json`); an update shows as a dot on the rail item.
+
+The page's release notes come from `PATCHNOTES.md`, which `Niskala.Updater` embeds as a resource
+(a release also carries it as `lib\PATCHNOTES.md`, the fallback), so an installed and a portable
+copy read them offline. When GitHub's latest release is a version those notes do not cover, its
+release text is shown above them. Both are Markdown rendered as plain headings, paragraphs and
+bullet rows: emphasis, code spans, links and HTML are reduced to their text, and a table row
+becomes one bullet that names its columns.
+`update install --dry-run` downloads and verifies the package, then deletes it.
 
 ## Uninstall execution
 
@@ -946,7 +1026,7 @@ symbolic links.
 Diagnostic logs are JSON lines in `%LocalAppData%\Niskala\logs` (`*.jsonl`, next to the `*.nsklog`
 install logs). Event ids are grouped by module: Core
 1xxx, Scanner 2xxx, Uninstall 3xxx, Guardian 4xxx, Tracker 5xxx, Repair 6xxx, Cleaner 7xxx, UI 8xxx,
-CLI 9xxx, Optimizer 10xxx.
+CLI 9xxx, Optimizer 10xxx, Updater 11xxx.
 
 ## License
 

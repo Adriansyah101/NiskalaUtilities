@@ -1,5 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Niskala.Core.Models;
 using Niskala.Guardian.Cleanup;
 using Niskala.Guardian.Journal;
@@ -43,6 +46,12 @@ public sealed partial class ResourceRow : ObservableObject
 
     public string Glyph => Strings.ResourceGlyph(Item.Kind);
 
+    public bool HasIcon => Icon is not null;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasIcon))]
+    public partial ImageSource? Icon { get; set; }
+
     [ObservableProperty]
     public partial bool IsEnabled { get; set; }
 
@@ -81,6 +90,10 @@ public sealed partial class ResourcesViewModel : TaskViewModel
         [ResourceKind.ContextMenu],
     ];
 
+    private const int IconDecodeSize = 72;
+
+    private readonly Dictionary<string, ImageSource?> _icons = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _iconsPending = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<ResourceItem> _items = [];
     private ResourceControl? _control;
 
@@ -179,10 +192,53 @@ public sealed partial class ResourcesViewModel : TaskViewModel
         Rows.Clear();
         foreach (ResourceItem item in _items.Where(i => kinds.Contains(i.Kind)))
         {
-            Rows.Add(new ResourceRow(this, item));
+            var row = new ResourceRow(this, item);
+            Rows.Add(row);
+            RequestIcon(row);
         }
 
         UpdateSummary();
         OnPropertyChanged(nameof(IsLoaded));
+    }
+
+    private void RequestIcon(ResourceRow row)
+    {
+        if (row.Item.Program is not { Length: > 0 } path)
+        {
+            return;
+        }
+
+        if (_icons.TryGetValue(path, out ImageSource? icon))
+        {
+            row.Icon = icon;
+        }
+        else if (_iconsPending.Add(path))
+        {
+            _ = LoadIconAsync(path);
+        }
+    }
+
+    private async Task LoadIconAsync(string path)
+    {
+        string? file = null;
+        try
+        {
+            file = await Services.Icons.GetFileAsync(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            UiLog.IconLoadFailed(Services.Host.LoggerFactory.CreateLogger<ResourcesViewModel>(), path, ex);
+        }
+
+        ImageSource? icon = file is null ? null : new BitmapImage(new Uri(file)) { DecodePixelWidth = IconDecodeSize, DecodePixelType = DecodePixelType.Logical };
+        _iconsPending.Remove(path);
+        _icons[path] = icon;
+        foreach (ResourceRow row in Rows)
+        {
+            if (path.Equals(row.Item.Program, StringComparison.OrdinalIgnoreCase))
+            {
+                row.Icon = icon;
+            }
+        }
     }
 }

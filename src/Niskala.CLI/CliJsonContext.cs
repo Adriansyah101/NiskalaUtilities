@@ -39,6 +39,8 @@ namespace Niskala.Cli;
 [JsonSerializable(typeof(StorageMapOutput))]
 [JsonSerializable(typeof(DuplicateOutput))]
 [JsonSerializable(typeof(WipeOutput))]
+[JsonSerializable(typeof(UpdateCheckOutput))]
+[JsonSerializable(typeof(UpdateInstallOutput))]
 internal sealed partial class CliJsonContext : JsonSerializerContext;
 
 internal static class CliJson

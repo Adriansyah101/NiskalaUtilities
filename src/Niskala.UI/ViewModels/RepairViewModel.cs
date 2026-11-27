@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
 using Niskala.Repair;
+using Niskala.Repair.Output;
 using Niskala.UI.Services;
 
 namespace Niskala.UI.ViewModels;
@@ -104,15 +105,12 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
     public partial RepairRow? Selected { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsIndeterminate))]
+    [NotifyPropertyChangedFor(nameof(IsIdle))]
     [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(CancelCommand))]
     public partial bool IsRunning { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIndeterminate))]
-    public partial bool HasPercent { get; set; }
-
-    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PercentText))]
     public partial double Percent { get; set; }
 
     [ObservableProperty]
@@ -132,13 +130,16 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
 
     public bool IsIdle => !IsRunning;
 
-    public bool IsIndeterminate => IsRunning && !HasPercent;
+    public string PercentText => FormatPercent(Percent);
 
     public string SelectedName => Selected?.Name ?? string.Empty;
 
     public string SelectedCommandLine => Selected?.CommandLine ?? string.Empty;
 
     public string SelectedSummary => Selected?.Summary ?? string.Empty;
+
+    public static string FormatPercent(double percent) =>
+        string.Create(CultureInfo.InvariantCulture, $"{(int)Math.Floor(Math.Clamp(double.IsNaN(percent) ? 0 : percent, 0, RepairProgressParser.Complete))}%");
 
     public void Dispose()
     {
@@ -161,7 +162,6 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
         LineAdded?.Invoke();
         LiveLine = string.Empty;
         Percent = 0;
-        HasPercent = false;
         Error = null;
         Warning = null;
         Result = null;
@@ -192,7 +192,6 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
         if (update.Percent is { } percent)
         {
             Percent = percent;
-            HasPercent = true;
         }
 
         if (!update.IsFinal)
@@ -220,21 +219,11 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
     {
         Elapsed = Clock(result.Elapsed);
         LiveLine = string.Empty;
-        string text = S.RepairOutcomeText(result.Outcome, result.StartError);
-        if (S.RepairDiagnosticText(result.Diagnostic) is { } diagnostic)
-        {
-            text = $"{text} {diagnostic}";
-        }
-
-        if (result.ExitCode is { } code)
-        {
-            text = $"{text} {S.RepairExit(code, Elapsed)}";
-        }
-
+        Percent = result.FinalPercent;
+        string text = S.RepairStatus(result, Elapsed);
         switch (result.Outcome)
         {
             case RepairOutcome.Succeeded:
-                Percent = HasPercent ? 100 : Percent;
                 Result = text;
                 break;
             case RepairOutcome.RestartRequired or RepairOutcome.IssuesFound or RepairOutcome.Cancelled:

@@ -28,6 +28,8 @@ public sealed partial class ShellView : UserControl
 
     public PaletteViewModel Palette => _services.Palette;
 
+    public UpdatesViewModel Updates => _services.Updates;
+
     private void Select(Section section) => Navigation.SelectedItem = section switch
     {
         Section.Tracker => TrackerItem,
@@ -42,6 +44,7 @@ public sealed partial class ShellView : UserControl
         Section.Wipe => WipeItem,
         Section.Repair => RepairItem,
         Section.History => HistoryItem,
+        Section.Updates => UpdatesItem,
         _ => AppsItem,
     };
 
@@ -57,9 +60,6 @@ public sealed partial class ShellView : UserControl
     {
         switch ((args.InvokedItemContainer as NavigationViewItem)?.Tag as string)
         {
-            case "Palette":
-                _services.Palette.Open();
-                break;
             case "Theme":
                 _services.ToggleTheme();
                 ThemeItem.Content = Application.Current is App { Theme: ElementTheme.Light } ? S.ThemeDark : S.ThemeLight;
@@ -88,6 +88,7 @@ public sealed partial class ShellView : UserControl
                 Section.Wipe => new SecureWipePage(_services.Wipe),
                 Section.Repair => new RepairPage(_services.Repair),
                 Section.History => new HistoryPage(_services.History),
+                Section.Updates => new UpdatesPage(_services.Updates),
                 _ => new AppsPage(_services.Apps),
             };
             _pages[section] = page;

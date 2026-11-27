@@ -9,6 +9,8 @@ internal sealed record UiSettings
 {
     public bool LightTheme { get; init; }
 
+    public bool SkipUpdateCheck { get; init; }
+
     public string Language { get; init; } = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "id" ? "id" : "en";
 
     [JsonIgnore]

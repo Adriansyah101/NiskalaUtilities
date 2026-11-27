@@ -129,7 +129,7 @@ public sealed class ConsoleOutputTests
         var lines = new List<ConsoleLine>();
         assembler.Append("Verification 4", lines);
         assembler.Append("2% complete.\r\n", lines);
-        Assert.Equal([new ConsoleLine("Verification 4", false), new ConsoleLine("Verification 42% complete.", true)], lines);
+        Assert.Equal([new ConsoleLine("Verification 4", false, IsOpen: true), new ConsoleLine("Verification 42% complete.", true)], lines);
     }
 
     [Fact]

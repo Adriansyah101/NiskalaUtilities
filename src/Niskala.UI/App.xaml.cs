@@ -46,6 +46,7 @@ public partial class App : Application
         _window.Activate();
         await splash.FadeOutAsync();
         splash.Close();
+        _services.Updates.CheckOnStart();
     }
 
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)

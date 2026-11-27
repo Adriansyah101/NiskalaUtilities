@@ -3,13 +3,14 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Niskala.Cli</RootNamespace>
     <AssemblyName>niskala</AssemblyName>
-    <AssemblyTitle>Niskala Utilities command line</AssemblyTitle>
+    <AssemblyTitle>Niskala Utilities CLI</AssemblyTitle>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\..\assets\niskala.ico</ApplicationIcon>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <PublishAot>true</PublishAot>
     <OptimizationPreference>Size</OptimizationPreference>
-    <StackTraceSupport>true</StackTraceSupport>
+    <IlcTrimMetadata>true</IlcTrimMetadata>
+    <StackTraceSupport>false</StackTraceSupport>
   </PropertyGroup>
 
   <ItemGroup>

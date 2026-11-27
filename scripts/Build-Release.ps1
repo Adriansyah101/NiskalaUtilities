@@ -2,7 +2,9 @@
 [CmdletBinding()]
 param(
     [ValidateSet('win-x64', 'win-arm64')]
-    [string]$Runtime = 'win-x64'
+    [string]$Runtime = 'win-x64',
+
+    [switch]$SignLocal
 )
 
 Set-StrictMode -Version Latest
@@ -14,12 +16,20 @@ $symbols = Join-Path $repo 'artifacts\symbols'
 $staging = Join-Path $repo 'artifacts\staging'
 $rules = Join-Path $repo 'rules'
 $license = Join-Path $repo 'LICENSE'
-$version = ([xml](Get-Content -Raw (Join-Path $repo 'Directory.Build.props'))).SelectSingleNode('/Project/PropertyGroup/Version').InnerText
+$patchNotes = Join-Path $repo 'PATCHNOTES.md'
+$certificateStaging = Join-Path $staging 'publisher'
+$publisherCertificate = Join-Path $certificateStaging 'niskala-pub.cer'
+$installerScript = Join-Path $repo 'installer\NiskalaUtilities.iss'
+$archiver = Join-Path $PSScriptRoot 'New-ReleaseArchive.cs'
+$props = [xml](Get-Content -Raw (Join-Path $repo 'Directory.Build.props'))
+$version = $props.SelectSingleNode('/Project/PropertyGroup/Version').InnerText
+$languages = $props.SelectSingleNode('/Project/PropertyGroup/SatelliteResourceLanguages').InnerText -split ';'
 $platform = @{ 'win-x64' = 'x64'; 'win-arm64' = 'ARM64' }[$Runtime]
 
 $product = 'Niskala Utilities'
-$cli = [pscustomobject]@{ Project = 'src\Niskala.CLI'; Name = "NiskalaUtilities-CLI-v$version-$Runtime"; Root = 'niskala.exe'; Files = 'niskala.exe', 'Niskala.EtwHelper.dll' }
-$app = [pscustomobject]@{ Project = 'src\Niskala.UI'; Name = "NiskalaUtilities-v$version-$Runtime"; Root = $null; Files = 'Niskala.exe', 'Niskala.EtwHelper.dll' }
+Add-Type -Namespace Niskala -Name Shell -MemberDefinition '[DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern uint ExtractIconExW(string file, int index, IntPtr[] large, IntPtr[] small, uint count);'
+$cli = [pscustomobject]@{ Project = 'src\Niskala.CLI'; Name = "NiskalaUtilities-CLI-v$version-$Runtime"; Root = 'niskala.exe'; Files = 'niskala.exe', 'Niskala.EtwHelper.dll'; Description = "$product CLI" }
+$app = [pscustomobject]@{ Project = 'src\Niskala.UI'; Name = "NiskalaUtilities-v$version-$Runtime"; Root = $null; Files = 'Niskala.exe', 'Niskala.EtwHelper.dll'; Description = $product }
 $launcherProject = Join-Path $repo 'native\Niskala.Launcher\Niskala.Launcher.vcxproj'
 $launcher = Join-Path $repo "native\Niskala.Launcher\bin\$platform\Release\Niskala.exe"
 
@@ -49,6 +59,7 @@ function Find-PrivateText {
     param([string]$Root, [string[]]$Terms)
 
     $latin1 = [Text.Encoding]::GetEncoding(28591)
+    $base = if (Test-Path -LiteralPath $Root -PathType Leaf) { Split-Path -Parent $Root } else { $Root }
     foreach ($file in Get-ChildItem -LiteralPath $Root -Recurse -File) {
         $bytes = [IO.File]::ReadAllBytes($file.FullName)
         $views = @($latin1.GetString($bytes), [Text.Encoding]::Unicode.GetString($bytes))
@@ -58,18 +69,29 @@ function Find-PrivateText {
 
         foreach ($term in $Terms) {
             if ($views | Where-Object { $_.IndexOf($term, [StringComparison]::OrdinalIgnoreCase) -ge 0 }) {
-                [pscustomobject]@{ File = $file.FullName.Substring($Root.Length + 1); Term = $term }
+                [pscustomobject]@{ File = $file.FullName.Substring($base.Length + 1); Term = $term }
             }
         }
     }
 }
 
 function Test-Product {
-    param([string]$Path)
+    param([string]$Path, [string]$Description)
 
     $info = (Get-Item -LiteralPath $Path).VersionInfo
-    if ($info.ProductName -ne $product -or $info.ProductVersion -notlike "$version*") {
-        throw "$Path says '$($info.ProductName)' $($info.ProductVersion), not '$product' $version."
+    $name = "$($info.ProductName)".Trim()
+    $productVersion = "$($info.ProductVersion)".Trim()
+    $fileDescription = "$($info.FileDescription)".Trim()
+    if ($name -ne $product -or $productVersion -notlike "$version*") {
+        throw "$Path says '$name' $productVersion, not '$product' $version."
+    }
+
+    if ($fileDescription -ne $Description) {
+        throw "$Path describes itself as '$fileDescription', not '$Description'."
+    }
+
+    if ([Niskala.Shell]::ExtractIconExW($Path, -1, $null, $null, 0) -eq 0) {
+        throw "$Path carries no icon."
     }
 }
 
@@ -120,6 +142,54 @@ function Test-Rules {
     }
 }
 
+function Test-CultureFolder {
+    param([string]$Name)
+
+    if ($Name -notmatch '^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$') {
+        return $false
+    }
+
+    try {
+        [void][Globalization.CultureInfo]::GetCultureInfo($Name)
+        $true
+    }
+    catch [Globalization.CultureNotFoundException] {
+        $false
+    }
+}
+
+function Remove-ForeignLanguages {
+    param([string]$Library)
+
+    $foreign = @(Get-ChildItem -LiteralPath $Library -Directory -Recurse | Where-Object { (Test-CultureFolder $_.Name) -and $languages -notcontains $_.Name })
+    $foreign | Sort-Object { $_.FullName.Length } -Descending | Remove-Item -Recurse -Force
+    $foreign.Count
+}
+
+function Find-InnoCompiler {
+    $command = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $editions = 'Inno Setup 7', 'Inno Setup 6'
+    $folders = @()
+    foreach ($edition in $editions) {
+        foreach ($hive in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall', 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall') {
+            $entry = Get-ItemProperty -LiteralPath (Join-Path $hive "$($edition)_is1") -ErrorAction SilentlyContinue
+            if ($entry -and $entry.PSObject.Properties['InstallLocation']) {
+                $folders += $entry.InstallLocation
+            }
+        }
+
+        $folders += @($env:ProgramFiles, ${env:ProgramFiles(x86)}, (Join-Path $env:LOCALAPPDATA 'Programs')) |
+            Where-Object { $_ } |
+            ForEach-Object { Join-Path $_ $edition }
+    }
+
+    $folders | ForEach-Object { Join-Path $_ 'ISCC.exe' } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+}
+
 function New-Layout {
     param($Payload, [string]$Published, [string]$RootExecutable)
 
@@ -129,13 +199,23 @@ function New-Layout {
     Copy-Item -LiteralPath $RootExecutable -Destination $output
     Copy-Rules (Join-Path $library 'rules')
     Copy-Item -LiteralPath $license -Destination $library
+    Copy-Item -LiteralPath $patchNotes -Destination $library
+    $removed = Remove-ForeignLanguages $library
+    if ($removed -gt 0) {
+        Write-Host "$($Payload.Name): removed $removed language folders other than $($languages -join ', ')."
+    }
+
+    $symbolFiles = Get-ChildItem -LiteralPath $output -Recurse -File -Filter '*.pdb'
+    if ($symbolFiles) {
+        throw "$($Payload.Name) still holds symbol files: $($symbolFiles.Name -join ', ')."
+    }
 
     $stray = Get-ChildItem -LiteralPath $output -Force | Where-Object { $_.Name -ne 'lib' -and $_.Extension -ne '.exe' }
     if ($stray) {
         throw "$($Payload.Name) has more than executables at its root: $($stray.Name -join ', ')."
     }
 
-    Get-ChildItem -LiteralPath $output -Filter '*.exe' | ForEach-Object { Test-Product $_.FullName }
+    Get-ChildItem -LiteralPath $output -Filter '*.exe' | ForEach-Object { Test-Product $_.FullName $Payload.Description }
     $output
 }
 
@@ -180,13 +260,24 @@ Copy-Item -LiteralPath ([IO.Path]::ChangeExtension($launcher, '.pdb')) -Destinat
 
 $cliPublished = Publish-Payload $cli
 $appPublished = Publish-Payload $app
-Test-Product (Join-Path $appPublished 'Niskala.exe')
+Test-Product (Join-Path $appPublished 'Niskala.exe') $app.Description
 $payloads = @(
     New-Layout $cli $cliPublished (Join-Path $cliPublished $cli.Root)
     New-Layout $app $appPublished $launcher
 )
 Clear-Folder $staging
 Test-Rules (Join-Path $payloads[0] $cli.Root)
+
+$signing = $null
+if ($SignLocal) {
+    $signing = & (Join-Path $PSScriptRoot 'Sign-Release.ps1') -CertificatePath $publisherCertificate -Path @(
+        Join-Path $payloads[1] 'Niskala.exe'
+        Join-Path $payloads[1] 'lib\Niskala.exe'
+        Join-Path $payloads[1] 'lib\Niskala.EtwHelper.dll'
+        Join-Path $payloads[0] $cli.Root
+        Join-Path $payloads[0] 'lib\Niskala.EtwHelper.dll'
+    )
+}
 
 $terms = @($env:USERNAME, $env:COMPUTERNAME, $env:USERPROFILE, $repo) |
     Where-Object { $_ -and $_.Length -ge 3 } |
@@ -199,23 +290,75 @@ if ($leaks) {
     throw "Local traces in the release:`n$($leaks -join "`n")"
 }
 
-Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
-$sums = foreach ($payload in $payloads) {
-    $zip = "$payload.zip"
-    $base = Split-Path -Parent $payload
-    $archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
-    try {
-        foreach ($file in Get-ChildItem -LiteralPath $payload -Recurse -File) {
-            $entry = $file.FullName.Substring($base.Length + 1).Replace('\', '/')
-            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $entry, [IO.Compression.CompressionLevel]::Optimal)
-        }
-    }
-    finally {
-        $archive.Dispose()
-    }
+if ($signing -and (Find-PrivateText -Root $signing.Certificate -Terms $terms)) {
+    Clear-Folder $certificateStaging
+    throw "Local traces in $(Split-Path -Leaf $signing.Certificate)."
+}
 
-    '{0}  {1}' -f (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path -Leaf $zip)
+$packages = @()
+$iscc = Find-InnoCompiler
+try {
+    if ($iscc) {
+        $installer = Join-Path $release "NiskalaUtilities-Setup-v$version-$Runtime.exe"
+        $isccArguments = @('/Q', "/DAppVersion=$version", "/DRuntime=$Runtime", "/DAppSource=$($payloads[1])", "/DCliSource=$($payloads[0])", "/DOutputDir=$release")
+        if ($signing) {
+            $isccArguments += '/DSignInstaller'
+            $isccArguments += "/DPublisherCertificate=$($signing.Certificate)"
+            $isccArguments += "/DPublisherThumbprint=$($signing.Thumbprint)"
+            $isccArguments += ('/Sniskala=$q{0}$q sign /fd SHA256 /sha1 {1} /s My /d $q{2}$q /du {3} $f' -f $signing.SignTool, $signing.Thumbprint, $signing.Description, $signing.ProjectUrl)
+        }
+
+        Invoke-Native $iscc ($isccArguments + $installerScript)
+        if (-not (Test-Path -LiteralPath $installer)) {
+            throw "ISCC.exe finished without writing $installer."
+        }
+
+        Test-Product $installer "$product Setup"
+        if ($signing -and (Get-AuthenticodeSignature -LiteralPath $installer).Status -ne 'Valid') {
+            throw "$installer is not validly signed."
+        }
+
+        $leaks = Find-PrivateText -Root $installer -Terms $terms
+        if ($leaks) {
+            throw "Local traces in $(Split-Path -Leaf $installer)."
+        }
+
+        $packages += $installer
+    }
+    else {
+        Write-Warning 'Inno Setup (ISCC.exe) was not found, so no installer was built. Install it with "winget install --id JRSoftware.InnoSetup -e" (or from jrsoftware.org) and run this script again.'
+    }
+}
+finally {
+    Clear-Folder $certificateStaging
+    if ((Test-Path -LiteralPath $staging) -and -not (Get-ChildItem -LiteralPath $staging -Force)) {
+        Remove-Item -LiteralPath $staging -Force
+    }
+}
+
+if (Test-Path -LiteralPath $certificateStaging) {
+    throw "$certificateStaging was not removed after the installer was built."
+}
+
+$zips = $payloads | ForEach-Object { "$_.zip" }
+$archiveArguments = for ($i = 0; $i -lt $payloads.Count; $i++) { $payloads[$i]; $zips[$i] }
+Invoke-Native 'dotnet' (@('run', '--file', $archiver, '--') + $archiveArguments)
+$packages += $zips
+
+$sums = foreach ($package in $packages) {
+    '{0}  {1}' -f (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path -Leaf $package)
 }
 [IO.File]::WriteAllText((Join-Path $release 'SHA256SUMS.txt'), (($sums -join "`n") + "`n"), (New-Object Text.UTF8Encoding $false))
+
+$expected = @($packages | ForEach-Object { Split-Path -Leaf $_ }) + 'SHA256SUMS.txt'
+$extra = @(Get-ChildItem -LiteralPath $release -File | Where-Object { $expected -notcontains $_.Name })
+if ($extra) {
+    throw "$release holds files that are not release assets: $($extra.Name -join ', ')."
+}
+
+$certificates = @(Get-ChildItem -LiteralPath $release -Recurse -File -Filter '*.cer')
+if ($certificates) {
+    throw "$release holds certificate files: $($certificates.Name -join ', ')."
+}
 
 Get-ChildItem -LiteralPath $release -File | Format-Table Name, @{ Label = 'Bytes'; Expression = { $_.Length.ToString('N0') }; Align = 'Right' } -AutoSize

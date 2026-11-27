@@ -23,6 +23,7 @@ public enum Section
     Wipe,
     Repair,
     History,
+    Updates,
 }
 
 public sealed class UiServices : IDisposable
@@ -52,6 +53,7 @@ public sealed class UiServices : IDisposable
         Wipe = new WipeViewModel(this);
         Repair = new RepairViewModel(this);
         History = new HistoryViewModel(this);
+        Updates = new UpdatesViewModel(this);
         Palette = new PaletteViewModel(this);
     }
 
@@ -97,6 +99,8 @@ public sealed class UiServices : IDisposable
 
     public HistoryViewModel History { get; }
 
+    public UpdatesViewModel Updates { get; }
+
     public PaletteViewModel Palette { get; }
 
     public void Navigate(Section section) => SectionRequested?.Invoke(section);
@@ -113,6 +117,7 @@ public sealed class UiServices : IDisposable
     {
         Apps.Relabel();
         Resources.UpdateSummary();
+        Updates.Relabel();
     }
 
     public void Dispose()
@@ -123,6 +128,7 @@ public sealed class UiServices : IDisposable
         }
 
         Repair.Dispose();
+        Updates.Dispose();
         Apps.Dispose();
         _extractor.Dispose();
         Host.Dispose();

@@ -59,7 +59,7 @@ public sealed class TransactionStore(string directory, ILogger? logger = null, T
         }
 
         using FileStream stream = File.OpenRead(file);
-        return JsonSerializer.Deserialize(stream, GuardianJsonContext.Default.TransactionRecord);
+        return JsonSerializer.Deserialize(stream, GuardianJsonContext.Default.TransactionRecord) is { } record ? WithEmptyLists(record) : null;
     }
 
     public RegistryBackup? LoadRegistryBackup(string id)
@@ -73,7 +73,9 @@ public sealed class TransactionStore(string directory, ILogger? logger = null, T
 
         using FileStream stream = File.OpenRead(file);
         using var zip = new GZipStream(stream, CompressionMode.Decompress);
-        return JsonSerializer.Deserialize(zip, GuardianJsonContext.Default.RegistryBackup);
+        return JsonSerializer.Deserialize(zip, GuardianJsonContext.Default.RegistryBackup) is { } backup
+            ? backup with { Entries = backup.Entries ?? [] }
+            : null;
     }
 
     public IReadOnlyList<TransactionRecord> List()
@@ -122,6 +124,15 @@ public sealed class TransactionStore(string directory, ILogger? logger = null, T
             File.Delete(temp);
         }
     }
+
+    private static TransactionRecord WithEmptyLists(TransactionRecord record) => record with
+    {
+        FirewallRules = record.FirewallRules ?? [],
+        ScheduledTasks = record.ScheduledTasks ?? [],
+        Items = record.Items ?? [],
+        Settings = record.Settings ?? [],
+        Notes = record.Notes ?? [],
+    };
 
     private static string Folder(string id) =>
         id.Length > 0 && id.All(c => char.IsAsciiLetterOrDigit(c) || c == '-')

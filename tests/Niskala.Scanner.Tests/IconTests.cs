@@ -184,6 +184,46 @@ public sealed class IconTests
         Assert.True(File.Exists(pending));
     }
 
+    [Fact]
+    public async Task File_icons_are_cached_apart_from_app_icons()
+    {
+        using var scratch = new ScratchFolder();
+        using var extractor = new IconExtractor();
+        string directory = Path.Combine(scratch.Root, "icons");
+        var cache = new IconCache(
+            extractor,
+            new IconSourceResolver(SystemCommandEnvironment.Instance, (_, _) => null),
+            directory,
+            NullLogger<IconCache>.Instance);
+
+        string? file = await cache.GetFileAsync(Notepad, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(file);
+        Assert.Equal(Path.Combine(directory, IconCache.FilesFolder), Path.GetDirectoryName(file));
+        Assert.Equal(256, AppxLogoLocator.PngWidth(file));
+        Assert.Equal(0, cache.Prune([]));
+        Assert.True(File.Exists(file));
+    }
+
+    [Fact]
+    public async Task File_without_an_embedded_icon_gets_no_generic_shell_icon()
+    {
+        using var scratch = new ScratchFolder();
+        using var extractor = new IconExtractor();
+        var cache = new IconCache(
+            extractor,
+            new IconSourceResolver(SystemCommandEnvironment.Instance, (_, _) => null),
+            Path.Combine(scratch.Root, "icons"),
+            NullLogger<IconCache>.Instance);
+        string plain = scratch.File(@"bin\plain.exe", "MZ"u8.ToArray());
+
+        Assert.Null(await cache.GetFileAsync(plain, TestContext.Current.CancellationToken));
+        Assert.Null(await cache.GetFileAsync(Path.Combine(scratch.Root, "missing.exe"), TestContext.Current.CancellationToken));
+        Assert.Null(await cache.GetFileAsync("notepad.exe", TestContext.Current.CancellationToken));
+        string files = Path.Combine(scratch.Root, "icons", IconCache.FilesFolder);
+        Assert.Empty(Directory.Exists(files) ? Directory.GetFiles(files) : []);
+    }
+
     [Theory]
     [InlineData("0123456789abcdef0123456789abcdef.png", true)]
     [InlineData("0123456789ABCDEF0123456789abcdef.png", false)]

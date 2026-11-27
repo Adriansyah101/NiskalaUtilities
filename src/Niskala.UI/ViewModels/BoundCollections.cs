@@ -40,6 +40,8 @@ public sealed partial class TransactionItemCollection : ObservableCollection<Tra
 
 public sealed partial class PaletteEntryCollection : ObservableCollection<PaletteEntry>;
 
+public sealed partial class NoteRowCollection : ObservableCollection<NoteRow>;
+
 public sealed partial class TextList : List<string>;
 
 public sealed partial class ReasonList : List<ReasonRow>;

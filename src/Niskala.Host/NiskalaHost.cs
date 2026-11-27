@@ -44,6 +44,7 @@ using Niskala.Uninstall.Preflight;
 using Niskala.Uninstall.Security;
 using Niskala.Uninstall.Steam;
 using Niskala.Uninstall.Verification;
+using Niskala.Updater;
 
 namespace Niskala.Host;
 
@@ -251,6 +252,8 @@ public sealed class NiskalaHost : IDisposable
     public SecureWiper CreateSecureWiper() => new(_guard.Value);
 
     public static SizeQueue CreateSizeQueue() => SizeQueue.Create(new DiskKindProbe());
+
+    public UpdateService CreateUpdateService(UpdateProduct product) => new(product, UpdateService.DetectInstall(), Logger<UpdateService>());
 
     public void Dispose() => LoggerFactory.Dispose();
 

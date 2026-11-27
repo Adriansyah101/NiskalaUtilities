@@ -26,5 +26,6 @@ root.Subcommands.Add(LogsCommand.Create(verbose));
 root.Subcommands.Add(RepairCommand.Create(verbose));
 root.Subcommands.Add(OptimizeCommand.Create(verbose));
 root.Subcommands.Add(ToolkitCommand.Create(verbose));
+root.Subcommands.Add(UpdateCommand.Create(verbose));
 
 return await root.Parse(args).InvokeAsync().ConfigureAwait(false);

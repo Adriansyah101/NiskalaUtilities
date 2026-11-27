@@ -263,6 +263,8 @@ public sealed partial class Strings
 
     public static void Use(bool indonesian) => Current = new Strings(indonesian);
 
+    public static Strings For(bool indonesian) => new(indonesian);
+
     public string AppsSummary(int count, string size) => T($"{count} apps · {size}", $"{count} aplikasi · {size}");
 
     public string OpenFailed(int error) => T($"Explorer could not open it (Win32 error {error}).", $"Explorer tidak dapat membukanya (galat Win32 {error}).");
@@ -549,18 +551,38 @@ public sealed partial class Strings
             ? T($"Run {name} ({commandLine})? Windows needs a restart afterwards.", $"Jalankan {name} ({commandLine})? Windows perlu dimulai ulang setelahnya.")
             : T($"Run {name} ({commandLine})? It changes Windows files or settings.", $"Jalankan {name} ({commandLine})? Ini mengubah berkas atau pengaturan Windows.");
 
-    public string RepairOutcomeText(RepairOutcome outcome, int? startError) => outcome switch
+    public string RepairStatus(RepairResult result, string elapsed)
     {
-        RepairOutcome.Succeeded => T("Finished.", "Selesai."),
-        RepairOutcome.RestartRequired => T("Finished; restart Windows to complete it.", "Selesai; mulai ulang Windows untuk menuntaskannya."),
-        RepairOutcome.IssuesFound => T("Finished and found problems.", "Selesai dan menemukan masalah."),
-        RepairOutcome.NotElevated => T("Needs administrator rights; nothing was started.", "Membutuhkan hak administrator; tidak ada yang dijalankan."),
-        RepairOutcome.StartFailed => T($"Did not start (Win32 error {startError}).", $"Tidak bisa dijalankan (galat Win32 {startError})."),
-        RepairOutcome.Cancelled => T("Cancelled; its processes were stopped.", "Dibatalkan; prosesnya sudah dihentikan."),
-        _ => T("Failed.", "Gagal."),
-    };
+        ArgumentNullException.ThrowIfNull(result);
+        string? diagnostic = RepairDiagnosticText(result.Diagnostic);
+        return result.Outcome switch
+        {
+            RepairOutcome.Succeeded => T($"Finished · {elapsed}", $"Selesai · {elapsed}"),
+            RepairOutcome.RestartRequired => T($"Finished · {elapsed}. Restart Windows to complete it.", $"Selesai · {elapsed}. Mulai ulang Windows untuk menuntaskannya."),
+            RepairOutcome.IssuesFound => Join(T($"Finished with problems found · {elapsed}.", $"Selesai dengan masalah ditemukan · {elapsed}."), diagnostic),
+            RepairOutcome.Cancelled => T($"Cancelled · {elapsed}. Its processes were stopped.", $"Dibatalkan · {elapsed}. Prosesnya sudah dihentikan."),
+            RepairOutcome.NotElevated => Join(T("Needs administrator rights, so nothing was started.", "Membutuhkan hak administrator, jadi tidak ada yang dijalankan."), diagnostic),
+            RepairOutcome.StartFailed => diagnostic is null
+                ? T($"Could not start the program (Windows error {result.StartError}).", $"Program tidak bisa dijalankan (galat Windows {result.StartError}).")
+                : T($"Could not start. {diagnostic}", $"Tidak bisa dijalankan. {diagnostic}"),
+            _ => Join(T($"Failed · {elapsed}.", $"Gagal · {elapsed}."), diagnostic ?? RepairFailureCode(result.ExitCode)),
+        };
+    }
 
-    public string? RepairDiagnosticText(RepairDiagnostic diagnostic) => diagnostic switch
+    private string? RepairFailureCode(int? code)
+    {
+        if (code is not { } value)
+        {
+            return null;
+        }
+
+        string shown = value < 0 ? string.Create(CultureInfo.InvariantCulture, $"0x{value:X8}") : value.ToString(CultureInfo.InvariantCulture);
+        return T($"The command stopped with error code {shown}.", $"Perintah berhenti dengan kode galat {shown}.");
+    }
+
+    private static string Join(string text, string? detail) => detail is null ? text : $"{text} {detail}";
+
+    private string? RepairDiagnosticText(RepairDiagnostic diagnostic) => diagnostic switch
     {
         RepairDiagnostic.ElevationRequired => T("Run Niskala as administrator.", "Jalankan Niskala sebagai administrator."),
         RepairDiagnostic.AccessDenied => T("Windows denied access to a setting the tool resets.", "Windows menolak akses ke pengaturan yang disetel ulang."),
@@ -573,9 +595,6 @@ public sealed partial class Strings
         RepairDiagnostic.ProgramMissing => T("The program is missing from System32.", "Programnya tidak ada di System32."),
         _ => null,
     };
-
-    public string RepairExit(int code, string elapsed) =>
-        T(string.Create(CultureInfo.InvariantCulture, $"Exit code {code} (0x{code:X8}) · {elapsed}"), string.Create(CultureInfo.InvariantCulture, $"Kode keluar {code} (0x{code:X8}) · {elapsed}"));
 
     public string PaletteForceApp(string name) => T($"Force Remove {name}", $"Copot Paksa {name}");
 

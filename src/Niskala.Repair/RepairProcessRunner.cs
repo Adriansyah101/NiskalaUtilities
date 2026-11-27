@@ -23,6 +23,10 @@ public sealed record RepairResult(
     TimeSpan Elapsed)
 {
     public bool Succeeded => Outcome is RepairOutcome.Succeeded or RepairOutcome.RestartRequired;
+
+    public bool RanToEnd => Succeeded || Outcome == RepairOutcome.IssuesFound;
+
+    public double FinalPercent => RanToEnd ? RepairProgressParser.Complete : Math.Clamp(LastPercent ?? 0, 0, RepairProgressParser.Complete);
 }
 
 internal sealed record ProcessRun(int? ExitCode, int? StartError, bool Cancelled, double? LastPercent);
@@ -133,6 +137,7 @@ public sealed class RepairProcessRunner(IRepairEnvironment environment, ILogger<
     {
         var decoder = new ConsoleTextDecoder(environment.OemCodePage);
         var assembler = new ConsoleLineAssembler();
+        var reader = new ProgressReader();
         var lines = new List<ConsoleLine>();
         byte[] buffer = new byte[ChunkBytes];
         try
@@ -161,7 +166,7 @@ public sealed class RepairProcessRunner(IRepairEnvironment environment, ILogger<
         {
             foreach (ConsoleLine line in lines)
             {
-                double? value = RepairProgressParser.TryParse(line.Text);
+                double? value = reader.Read(line);
                 if (value is not null)
                 {
                     percent.Last = value;

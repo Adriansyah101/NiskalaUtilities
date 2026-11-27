@@ -10,20 +10,32 @@ public sealed class IconCache(IconExtractor extractor, IconSourceResolver resolv
 {
     public const int Size = 256;
 
+    public const string FilesFolder = "files";
+
     private const int KeyBytes = 16;
 
     public static string DefaultDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Niskala", "icons");
 
-    public async Task<string?> GetAsync(InstalledApp app, CancellationToken cancellationToken = default)
+    public Task<string?> GetAsync(InstalledApp app, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(app);
-        if (resolver.Resolve(app) is not { } source)
-        {
-            return null;
-        }
+        return resolver.Resolve(app) is { } source
+            ? GetAsync(source, app.Id, directory, shellFallback: true, cancellationToken)
+            : Task.FromResult<string?>(null);
+    }
 
-        string file = Path.Combine(directory, FileName(source));
+    public Task<string?> GetFileAsync(string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        return Path.IsPathFullyQualified(path) && File.Exists(path)
+            ? GetAsync(new IconSource(IconSourceKind.Resource, path, 0), path, Path.Combine(directory, FilesFolder), shellFallback: false, cancellationToken)
+            : Task.FromResult<string?>(null);
+    }
+
+    private async Task<string?> GetAsync(IconSource source, string owner, string folder, bool shellFallback, CancellationToken cancellationToken)
+    {
+        string file = Path.Combine(folder, FileName(source));
         if (File.Exists(file))
         {
             return file;
@@ -32,17 +44,17 @@ public sealed class IconCache(IconExtractor extractor, IconSourceResolver resolv
         string temp = $"{file}.{Guid.NewGuid():N}.tmp";
         try
         {
-            Directory.CreateDirectory(directory);
+            Directory.CreateDirectory(folder);
             if (source.Kind == IconSourceKind.Image)
             {
                 File.Copy(source.Path, temp, overwrite: true);
             }
             else
             {
-                IconPixels? pixels = await extractor.ExtractAsync(source, Size, cancellationToken).ConfigureAwait(false);
+                IconPixels? pixels = await extractor.ExtractAsync(source, Size, shellFallback, cancellationToken).ConfigureAwait(false);
                 if (pixels is null)
                 {
-                    ScannerLog.IconNotFound(logger, app.Id, source.Path, source.Index);
+                    ScannerLog.IconNotFound(logger, owner, source.Path, source.Index);
                     return null;
                 }
 
@@ -58,14 +70,14 @@ public sealed class IconCache(IconExtractor extractor, IconSourceResolver resolv
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && File.Exists(file))
             {
-                ScannerLog.IconKeptExisting(logger, app.Id, ex);
+                ScannerLog.IconKeptExisting(logger, owner, ex);
             }
 
             return file;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ScannerLog.IconWriteFailed(logger, app.Id, ex);
+            ScannerLog.IconWriteFailed(logger, owner, ex);
             return null;
         }
         finally

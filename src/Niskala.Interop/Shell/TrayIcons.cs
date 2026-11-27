@@ -89,7 +89,7 @@ public static partial class TrayIcons
         foreach (string name in root.GetSubKeyNames())
         {
             using RegistryKey? entry = root.OpenSubKey(name);
-            if (entry?.GetValue("ExecutablePath") is not string stored || NotifyIconSetting.ExpandPath(stored, KnownFolder) is not { } path)
+            if (entry?.GetValue("ExecutablePath") is not string stored || NotifyIconSetting.ExpandPath(stored, KnownFolders.Find) is not { } path)
             {
                 continue;
             }
@@ -217,22 +217,6 @@ public static partial class TrayIcons
     {
         HWND island = PInvoke.FindWindowEx(HWND.Null, HWND.Null, OverflowIslandClass, null);
         return !island.IsNull && PInvoke.IsWindowVisible(island);
-    }
-
-    private static unsafe string? KnownFolder(Guid folder)
-    {
-        PWSTR path = default;
-        try
-        {
-            return PInvoke.SHGetKnownFolderPath(&folder, KNOWN_FOLDER_FLAG.KF_FLAG_DEFAULT, HANDLE.Null, &path).Succeeded ? path.ToString() : null;
-        }
-        finally
-        {
-            if (path.Value is not null)
-            {
-                PInvoke.CoTaskMemFree(path);
-            }
-        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

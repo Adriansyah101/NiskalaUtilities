@@ -38,6 +38,8 @@ internal static class Format
 
     public static Visibility VisibleText(string? text) => string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
 
+    public static Visibility NoText(string? text) => string.IsNullOrEmpty(text) ? Visibility.Visible : Visibility.Collapsed;
+
     public static Visibility VisibleCount(int count) => count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public static Visibility Empty(int count) => count == 0 ? Visibility.Visible : Visibility.Collapsed;

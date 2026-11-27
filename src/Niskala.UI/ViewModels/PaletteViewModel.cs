@@ -99,6 +99,11 @@ public sealed partial class PaletteViewModel : ObservableObject
         yield return new PaletteEntry("", S.PaletteStartup, S.PaletteStartupHint, () => _services.Navigate(Section.Resources));
         yield return new PaletteEntry("\uEDA2", S.PaletteStorage, S.PaletteStorageHint, () => _services.Navigate(Section.Storage));
         yield return new PaletteEntry("", S.PaletteRepair, S.PaletteRepairHint, () => _services.Navigate(Section.Repair));
+        yield return new PaletteEntry("\uE895", S.PaletteUpdates, S.PaletteUpdatesHint, () =>
+        {
+            _services.Navigate(Section.Updates);
+            _services.Updates.CheckCommand.Execute(null);
+        });
         yield return new PaletteEntry("", S.PaletteTheme, S.PaletteThemeHint, _services.ToggleTheme);
         yield return new PaletteEntry("", S.PaletteLanguage, S.PaletteLanguageHint, _services.ToggleLanguage);
     }

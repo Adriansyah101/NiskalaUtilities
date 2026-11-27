@@ -106,14 +106,17 @@
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <ProgressBar Maximum="100" Value="{x:Bind ViewModel.Percent, Mode=OneWay}" IsIndeterminate="{x:Bind ViewModel.IsIndeterminate, Mode=OneWay}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.Elapsed, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" FontFamily="{StaticResource NiskalaMonoFont}" />
-            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{x:Bind ViewModel.LiveLine, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+            <ProgressBar IsIndeterminate="False" Minimum="0" Maximum="100" Value="{x:Bind ViewModel.Percent, Mode=OneWay}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.PercentText, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" FontFamily="{StaticResource NiskalaMonoFont}"
+                       MinWidth="44" TextAlignment="Right" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Elapsed, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" FontFamily="{StaticResource NiskalaMonoFont}" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{x:Bind ViewModel.LiveLine, Mode=OneWay}" Style="{StaticResource MonoTextStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
           </Grid>
 
           <Border Grid.Row="2" CornerRadius="8" Background="{ThemeResource NiskalaBackgroundBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1" Padding="10,6">

@@ -2,13 +2,14 @@ using System.Text;
 
 namespace Niskala.Repair.Output;
 
-public readonly record struct ConsoleLine(string Text, bool IsFinal);
+public readonly record struct ConsoleLine(string Text, bool IsFinal, bool IsOpen = false);
 
 internal sealed class ConsoleLineAssembler
 {
     private readonly StringBuilder _line = new();
     private bool _returned;
     private bool _changed;
+    private bool _open;
 
     public void Append(ReadOnlySpan<char> text, List<ConsoleLine> lines)
     {
@@ -19,9 +20,7 @@ internal sealed class ConsoleLineAssembler
             {
                 case '\n':
                     lines.Add(new ConsoleLine(_line.ToString(), IsFinal: true));
-                    _line.Clear();
-                    _returned = false;
-                    _changed = false;
+                    Reset();
                     break;
                 case '\r':
                     _returned = true;
@@ -31,13 +30,12 @@ internal sealed class ConsoleLineAssembler
                 default:
                     if (_returned)
                     {
-                        if (_changed)
+                        if (_changed || _open)
                         {
                             lines.Add(new ConsoleLine(_line.ToString(), IsFinal: false));
                         }
 
-                        _line.Clear();
-                        _returned = false;
+                        Reset();
                     }
 
                     _line.Append(c);
@@ -46,9 +44,10 @@ internal sealed class ConsoleLineAssembler
             }
         }
 
-        if (_changed)
+        if (_changed || (_open && _returned))
         {
-            lines.Add(new ConsoleLine(_line.ToString(), IsFinal: false));
+            lines.Add(new ConsoleLine(_line.ToString(), IsFinal: false, IsOpen: !_returned));
+            _open = !_returned;
             _changed = false;
         }
     }
@@ -61,9 +60,15 @@ internal sealed class ConsoleLineAssembler
         }
 
         var last = new ConsoleLine(_line.ToString(), IsFinal: true);
+        Reset();
+        return last;
+    }
+
+    private void Reset()
+    {
         _line.Clear();
         _returned = false;
         _changed = false;
-        return last;
+        _open = false;
     }
 }
