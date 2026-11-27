@@ -42,6 +42,10 @@ public sealed partial class PaletteEntryCollection : ObservableCollection<Palett
 
 public sealed partial class NoteRowCollection : ObservableCollection<NoteRow>;
 
+public sealed partial class NavCategoryCollection : ObservableCollection<NavCategory>;
+
+public sealed partial class NavPageCollection : ObservableCollection<NavPage>;
+
 public sealed partial class TextList : List<string>;
 
 public sealed partial class ReasonList : List<ReasonRow>;

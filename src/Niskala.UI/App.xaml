@@ -32,13 +32,14 @@
           <SolidColorBrush x:Key="NiskalaWarningBrush" Color="#E3B25E" />
           <SolidColorBrush x:Key="NiskalaDangerBrush" Color="#EA7A7E" />
           <SolidColorBrush x:Key="NiskalaPlateBrush" Color="#1F2128" />
+          <SolidColorBrush x:Key="NiskalaPaneBrush" Color="#0E0F12" />
+          <SolidColorBrush x:Key="NiskalaNavHoverBrush" Color="#17FFFFFF" />
+          <SolidColorBrush x:Key="NiskalaNavPressedBrush" Color="#0CFFFFFF" />
+          <SolidColorBrush x:Key="NiskalaNavOpenBrush" Color="#10FFFFFF" />
+          <SolidColorBrush x:Key="NiskalaNavGuideBrush" Color="#343846" />
+          <SolidColorBrush x:Key="NiskalaScrimBrush" Color="#A6000000" />
 
           <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="#09090B" />
-          <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#09090B" />
-          <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#0E0F12" />
-          <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
-          <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
-          <SolidColorBrush x:Key="SplitViewLightDismissOverlayBackground" Color="#80000000" />
           <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#16171C" />
           <SolidColorBrush x:Key="ToggleButtonBackground" Color="#121317" />
           <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#1E2027" />
@@ -75,13 +76,14 @@
           <SolidColorBrush x:Key="NiskalaWarningBrush" Color="#A86A0C" />
           <SolidColorBrush x:Key="NiskalaDangerBrush" Color="#C23B40" />
           <SolidColorBrush x:Key="NiskalaPlateBrush" Color="#EEF0F4" />
+          <SolidColorBrush x:Key="NiskalaPaneBrush" Color="#EEF0F3" />
+          <SolidColorBrush x:Key="NiskalaNavHoverBrush" Color="#0F000000" />
+          <SolidColorBrush x:Key="NiskalaNavPressedBrush" Color="#1A000000" />
+          <SolidColorBrush x:Key="NiskalaNavOpenBrush" Color="#0B000000" />
+          <SolidColorBrush x:Key="NiskalaNavGuideBrush" Color="#C9CDD8" />
+          <SolidColorBrush x:Key="NiskalaScrimBrush" Color="#590B192C" />
 
           <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="#F5F6F8" />
-          <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#F5F6F8" />
-          <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#EEF0F3" />
-          <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
-          <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
-          <SolidColorBrush x:Key="SplitViewLightDismissOverlayBackground" Color="#33000000" />
           <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#FFFFFF" />
           <SolidColorBrush x:Key="ToggleButtonBackground" Color="#FFFFFF" />
           <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#F0F1F4" />

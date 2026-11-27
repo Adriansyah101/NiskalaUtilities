@@ -57,8 +57,6 @@ public sealed class UiServices : IDisposable
         Palette = new PaletteViewModel(this);
     }
 
-    public event Action<Section>? SectionRequested;
-
     public event Action? ThemeToggleRequested;
 
     public event Action? LanguageToggleRequested;
@@ -103,7 +101,9 @@ public sealed class UiServices : IDisposable
 
     public PaletteViewModel Palette { get; }
 
-    public void Navigate(Section section) => SectionRequested?.Invoke(section);
+    public NavigationViewModel Navigation { get; } = new();
+
+    public void Navigate(Section section) => Navigation.Select(section);
 
     public void ToggleTheme() => ThemeToggleRequested?.Invoke();
 
@@ -115,6 +115,7 @@ public sealed class UiServices : IDisposable
 
     public void Relabel()
     {
+        Navigation.Relabel(Strings.Current);
         Apps.Relabel();
         Resources.UpdateSummary();
         Updates.Relabel();

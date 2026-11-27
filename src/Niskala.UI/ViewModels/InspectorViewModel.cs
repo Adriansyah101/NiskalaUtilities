@@ -63,6 +63,7 @@ public sealed partial class InspectorViewModel : ObservableObject
     public Strings S => Strings.Current;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowScrim))]
     public partial bool IsOpen { get; set; }
 
     [ObservableProperty]
@@ -81,7 +82,7 @@ public sealed partial class InspectorViewModel : ObservableObject
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDetails), nameof(IsFlow), nameof(IsSteam), nameof(IsBatch), nameof(ShowDone), nameof(Name), nameof(Subtitle))]
+    [NotifyPropertyChangedFor(nameof(IsDetails), nameof(IsFlow), nameof(ShowScrim), nameof(IsSteam), nameof(IsBatch), nameof(ShowDone), nameof(Name), nameof(Subtitle))]
     public partial FlowKind Flow { get; set; }
 
     [ObservableProperty]
@@ -193,6 +194,8 @@ public sealed partial class InspectorViewModel : ObservableObject
     public bool IsDetails => Flow == FlowKind.None;
 
     public bool IsFlow => Flow != FlowKind.None;
+
+    public bool ShowScrim => IsOpen && IsFlow;
 
     public bool IsSteam => Flow == FlowKind.Steam;
 

@@ -14,7 +14,7 @@ analysed or reused.
 One engine, two front ends: `niskala.exe`, a command line, and `Niskala.exe`, a WinUI 3 desktop
 app. Both are Native AOT builds (`win-x64`, `win-arm64`). The product name is Niskala Utilities;
 namespaces, file names, the `.nsklog` extension and `%LocalAppData%\Niskala` keep the short name.
-This is an early release: version 0.1.1. Released under the GNU General Public License v3.0; see
+This is an early release: version 0.1.2. Released under the GNU General Public License v3.0; see
 [License](#license).
 
 ## Modules
@@ -163,7 +163,7 @@ first failure:
 6. **Privacy scan.** Every shipped file is searched as ASCII and as UTF-16 for the user name, the
    machine name, the profile path and the repository path. Any hit fails the build.
 7. **Installer.** `ISCC.exe` compiles `installer/NiskalaUtilities.iss` from both payloads into
-   `NiskalaUtilities-Setup-v0.1.1-win-x64.exe` (LZMA2 ultra64, solid). It installs to
+   `NiskalaUtilities-Setup-v0.1.2-win-x64.exe` (LZMA2 ultra64, solid). It installs to
    `%ProgramFiles%\Niskala Utilities` with the desktop app at the root, the optional command line
    in `cli\` (its own `niskala.exe` and `lib\`, since the two names collide), a Start menu
    shortcut, an optional desktop shortcut and an optional `PATH` entry for `cli\`, which the
@@ -174,7 +174,7 @@ first failure:
 8. **Archives.** Each payload is zipped with its folder at the root by
    `scripts/New-ReleaseArchive.cs` (`dotnet run --file`, `CompressionLevel.SmallestSize`; Windows
    PowerShell 5.1 runs on .NET Framework, which lacks that level):
-   `NiskalaUtilities-v0.1.1-win-x64.zip` and `NiskalaUtilities-CLI-v0.1.1-win-x64.zip`.
+   `NiskalaUtilities-v0.1.2-win-x64.zip` and `NiskalaUtilities-CLI-v0.1.2-win-x64.zip`.
    `SHA256SUMS.txt` lists the installer and the two zips in `sha256sum -c` format, and the build
    fails if `artifacts/release` holds any other file. Upload it with
    every release: the updater refuses a release without it.
@@ -308,10 +308,16 @@ and `UTILITIES` fade in and rise (0.55 to 1 s), and the card fades out once the 
 ready (from 1.15 s). Everything is XAML: the monogram is one vector control (`NiskalaMark`) shared
 by the splash and the title bar, animated by storyboards; no image file is loaded. The executables
 carry `assets/niskala.ico` (16 to 256 px), and the main window takes its icon from that resource.
-A left rail, open and docked at start (320 px, folded by its menu button), holds thirteen sections
-in four groups (Apps, Cleaning, Performance, Maintenance) with Updates, theme and language in its
-footer; `Ctrl+K` (or the search box in the title bar) opens a command palette that finds apps and runs
-force removal, Target Picker, restore and the rest. The default theme is a dark slate
+A left rail, open and docked at start (272 px, folded to a 56 px icon bar by its menu button), holds
+thirteen sections under four categories (Apps, Cleaning, Performance, Maintenance), each an item with
+its own icon that opens and closes its pages with a click. The category of the page on screen starts
+open and wears an accent pill, another open category a neutral one; pages are indented beside a thin
+guide line that marks the page on screen. With every category open the rail still fits the default
+window without a scroll bar. Folded, a category's icon lists its pages in a menu. Updates, theme and
+language sit in its footer. `Ctrl+K` (or the search box in the title bar) opens a command palette that
+finds apps and runs force removal, Target Picker, restore and the rest; a page opened from there, or
+from another page, opens its category and highlights itself. The rail is `NavigationViewModel` (state)
+and `NavButton` (a templated `Button` with Active, Open and Compact states). The default theme is a dark slate
 (`#09090b` / `#121317`); a light theme and English or Indonesian are one click away in the rail
 and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:Bind}`.
 
@@ -319,7 +325,8 @@ and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:
   installed, Broken), 256 px icons (packages on their `BackgroundColor` plate) and folder sizes
   measured in the background; a row that scrolls into view jumps the size queue (`SizeQueue`).
   Selecting an app opens an inspector drawer on the right with its details. Each row has a check
-  box; from two checked apps up, **Batch Remove (N)** starts one queue for all of them.
+  box; from two checked apps up, **Batch Remove (N)** starts one queue for all of them. While a
+  removal flow is open, a dark layer (`NiskalaScrimBrush`) covers the list behind the drawer.
 - **Uninstall, Force Remove, Steam and Batch Remove flows.** Starting one widens the drawer into a layout locked to the
   window height, without a page scroll bar, that fits from 720 px up: a one-line stepper
   (fingerprint, restore point, live process tree, leftover scan, review; force and Steam have their
@@ -628,7 +635,7 @@ The Updates page (the rail's footer, or Ctrl+K) and `niskala update` share `Nisk
 1. **Check.** `GET https://api.github.com/repos/Adriansyah101/NiskalaUtilities/releases/latest`
    with `User-Agent: NiskalaUtilities/<version>`, read through a source-generated
    `JsonSerializerContext`. Drafts, pre-releases and pre-release tags are skipped; a `404` means no
-   release yet. The tag (`v0.1.1` or `V0.1.1`) is compared with the running version by semantic
+   release yet. The tag (`v0.1.2` or `V0.1.2`) is compared with the running version by semantic
    versioning precedence. Only assets named exactly for that version and runtime and served from
    `github.com` count: `NiskalaUtilities-Setup-v<version>-<rid>.exe`,
    `NiskalaUtilities-v<version>-<rid>.zip`, `NiskalaUtilities-CLI-v<version>-<rid>.zip` and

@@ -25,6 +25,25 @@ public sealed partial class Strings
     public string NavStorage => T("Storage Map", "Peta Penyimpanan");
     public string NavDuplicates => T("Duplicate Scan", "Pindai Duplikat");
     public string NavWipe => T("Secure Wipe", "Timpa Permanen");
+    public string NavTogglePane => T("Collapse or expand the menu", "Ciutkan atau bentangkan menu");
+
+    public string NavTitle(Section section) => section switch
+    {
+        Section.Tracker => NavTracker,
+        Section.Picker => NavPicker,
+        Section.QuickScan => NavQuickScan,
+        Section.SelectiveClean => NavSelectiveClean,
+        Section.Registry => NavRegistry,
+        Section.Resources => NavResources,
+        Section.Suspend => NavSuspend,
+        Section.Storage => NavStorage,
+        Section.Duplicates => NavDuplicates,
+        Section.Wipe => NavWipe,
+        Section.Repair => NavRepair,
+        Section.History => NavHistory,
+        Section.Updates => NavUpdates,
+        _ => NavApps,
+    };
 
     public string Scan => T("Scan", "Pindai");
     public string CleanNow => T("Clean", "Bersihkan");

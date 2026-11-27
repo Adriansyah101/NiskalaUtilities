@@ -4,114 +4,161 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:vm="using:Niskala.UI.ViewModels"
+    xmlns:views="using:Niskala.UI.Views"
     xmlns:services="using:Niskala.UI.Services">
-  <Grid>
-    <NavigationView
-        x:Name="Navigation"
-        PaneDisplayMode="Left"
-        IsPaneOpen="True"
-        IsBackButtonVisible="Collapsed"
-        IsSettingsVisible="False"
-        IsPaneToggleButtonVisible="True"
-        OpenPaneLength="320"
-        SelectionChanged="OnSelectionChanged"
-        ItemInvoked="OnItemInvoked">
-      <NavigationView.MenuItems>
-        <NavigationViewItemHeader Content="{x:Bind S.NavGroupApps}" />
-        <NavigationViewItem x:Name="AppsItem" Content="{x:Bind S.NavApps}" Tag="Apps" ToolTipService.ToolTip="{x:Bind S.NavApps}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE71D;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="TrackerItem" Content="{x:Bind S.NavTracker}" Tag="Tracker" ToolTipService.ToolTip="{x:Bind S.NavTracker}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE9D9;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="PickerItem" Content="{x:Bind S.NavPicker}" Tag="Picker" ToolTipService.ToolTip="{x:Bind S.NavPicker}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE81D;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItemHeader Content="{x:Bind S.NavGroupClean}" />
-        <NavigationViewItem x:Name="QuickScanItem" Content="{x:Bind S.NavQuickScan}" Tag="QuickScan" ToolTipService.ToolTip="{x:Bind S.NavQuickScan}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE945;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="SelectiveCleanItem" Content="{x:Bind S.NavSelectiveClean}" Tag="SelectiveClean" ToolTipService.ToolTip="{x:Bind S.NavSelectiveClean}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE74D;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="RegistryItem" Content="{x:Bind S.NavRegistry}" Tag="Registry" ToolTipService.ToolTip="{x:Bind S.NavRegistry}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE9F5;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItemHeader Content="{x:Bind S.NavGroupPerformance}" />
-        <NavigationViewItem x:Name="ResourcesItem" Content="{x:Bind S.NavResources}" Tag="Resources" ToolTipService.ToolTip="{x:Bind S.NavResources}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xEC4A;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="SuspendItem" Content="{x:Bind S.NavSuspend}" Tag="Suspend" ToolTipService.ToolTip="{x:Bind S.NavSuspend}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE769;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItemHeader Content="{x:Bind S.NavGroupTools}" />
-        <NavigationViewItem x:Name="StorageItem" Content="{x:Bind S.NavStorage}" Tag="Storage" ToolTipService.ToolTip="{x:Bind S.NavStorage}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xEDA2;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="DuplicatesItem" Content="{x:Bind S.NavDuplicates}" Tag="Duplicates" ToolTipService.ToolTip="{x:Bind S.NavDuplicates}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE8C8;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="WipeItem" Content="{x:Bind S.NavWipe}" Tag="Wipe" ToolTipService.ToolTip="{x:Bind S.NavWipe}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE75C;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="RepairItem" Content="{x:Bind S.NavRepair}" Tag="Repair" ToolTipService.ToolTip="{x:Bind S.NavRepair}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE90F;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="HistoryItem" Content="{x:Bind S.NavHistory}" Tag="History" ToolTipService.ToolTip="{x:Bind S.NavHistory}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE81C;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-      </NavigationView.MenuItems>
-      <NavigationView.FooterMenuItems>
-        <NavigationViewItem x:Name="UpdatesItem" Content="{x:Bind S.NavUpdates}" Tag="Updates" ToolTipService.ToolTip="{x:Bind S.NavUpdates}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE895;" />
-          </NavigationViewItem.Icon>
-          <NavigationViewItem.InfoBadge>
-            <InfoBadge Style="{ThemeResource AttentionDotInfoBadgeStyle}" Visibility="{x:Bind services:Format.Visible(Updates.IsAvailable), Mode=OneWay}" />
-          </NavigationViewItem.InfoBadge>
-        </NavigationViewItem>
-        <NavigationViewItem x:Name="ThemeItem" Tag="Theme" SelectsOnInvoked="False">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE706;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-        <NavigationViewItem Content="{x:Bind S.SwitchLanguage}" Tag="Language" SelectsOnInvoked="False" ToolTipService.ToolTip="{x:Bind S.SwitchLanguage}">
-          <NavigationViewItem.Icon>
-            <FontIcon Glyph="&#xE774;" />
-          </NavigationViewItem.Icon>
-        </NavigationViewItem>
-      </NavigationView.FooterMenuItems>
+  <UserControl.Resources>
+    <Style x:Key="NavButtonStyle" TargetType="views:NavButton">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="12,0,10,0" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="UseSystemFocusVisuals" Value="True" />
+      <Setter Property="FocusVisualMargin" Value="-1" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="views:NavButton">
+            <Grid x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+              <Border x:Name="ActiveFill" Background="{ThemeResource NiskalaAccentSoftBrush}" Opacity="0" />
+              <Border x:Name="OpenFill" Background="{ThemeResource NiskalaNavOpenBrush}" Opacity="0" />
+              <Border x:Name="HoverFill" Background="{ThemeResource NiskalaNavHoverBrush}" Opacity="0" />
+              <Grid Padding="{TemplateBinding Padding}" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="16" />
+                  <ColumnDefinition x:Name="LabelColumn" Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <FontIcon x:Name="Icon" Glyph="{TemplateBinding Glyph}" FontSize="16" Foreground="{ThemeResource NiskalaMutedBrush}" />
+                <TextBlock x:Name="Text" Grid.Column="1" Text="{TemplateBinding Label}" FontSize="{TemplateBinding FontSize}" FontWeight="{TemplateBinding FontWeight}"
+                           Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                <FontIcon x:Name="Trailing" Grid.Column="2" Glyph="{TemplateBinding TrailingGlyph}" FontSize="10" Foreground="{ThemeResource NiskalaFaintBrush}" />
+              </Grid>
+              <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                  <VisualState x:Name="Normal" />
+                  <VisualState x:Name="PointerOver">
+                    <VisualState.Setters>
+                      <Setter Target="HoverFill.Opacity" Value="1" />
+                    </VisualState.Setters>
+                  </VisualState>
+                  <VisualState x:Name="Pressed">
+                    <VisualState.Setters>
+                      <Setter Target="HoverFill.Opacity" Value="1" />
+                      <Setter Target="HoverFill.Background" Value="{ThemeResource NiskalaNavPressedBrush}" />
+                    </VisualState.Setters>
+                  </VisualState>
+                  <VisualState x:Name="Disabled" />
+                </VisualStateGroup>
+                <VisualStateGroup x:Name="EmphasisStates">
+                  <VisualState x:Name="Plain" />
+                  <VisualState x:Name="Open">
+                    <VisualState.Setters>
+                      <Setter Target="OpenFill.Opacity" Value="1" />
+                      <Setter Target="Icon.Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+                    </VisualState.Setters>
+                  </VisualState>
+                  <VisualState x:Name="Active">
+                    <VisualState.Setters>
+                      <Setter Target="ActiveFill.Opacity" Value="1" />
+                      <Setter Target="Icon.Foreground" Value="{ThemeResource NiskalaAccentBrush}" />
+                      <Setter Target="Text.Foreground" Value="{ThemeResource NiskalaAccentBrush}" />
+                    </VisualState.Setters>
+                  </VisualState>
+                </VisualStateGroup>
+                <VisualStateGroup x:Name="WidthStates">
+                  <VisualState x:Name="Full" />
+                  <VisualState x:Name="Compact">
+                    <VisualState.Setters>
+                      <Setter Target="Text.Visibility" Value="Collapsed" />
+                      <Setter Target="Trailing.Visibility" Value="Collapsed" />
+                      <Setter Target="LabelColumn.Width" Value="0" />
+                    </VisualState.Setters>
+                  </VisualState>
+                </VisualStateGroup>
+              </VisualStateManager.VisualStateGroups>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
 
-      <Border x:Name="PageHost" />
-    </NavigationView>
+    <Style x:Key="NavPageStyle" TargetType="views:NavButton" BasedOn="{StaticResource NavButtonStyle}">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="Padding" Value="10,0,10,0" />
+    </Style>
+  </UserControl.Resources>
 
-    <Popup x:Name="PalettePopup" IsLightDismissEnabled="True" IsOpen="{x:Bind Palette.IsOpen, Mode=TwoWay}" Opened="OnPaletteOpened">
+  <Grid Background="{ThemeResource NiskalaPaneBrush}">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <Grid x:Name="Pane" Width="{x:Bind Nav.PaneWidth, Mode=OneWay}" Padding="8,6,8,8" RowSpacing="6">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="&#xE700;" HorizontalAlignment="Left" Width="40" Click="OnPaneToggleClick"
+                       AutomationProperties.Name="{x:Bind S.NavTogglePane}" ToolTipService.ToolTip="{x:Bind S.NavTogglePane}" IsCompact="True" />
+
+      <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{x:Bind Nav.Categories}" XYFocusKeyboardNavigation="Enabled" IsTabStop="False">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Spacing="2" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:NavCategory">
+              <StackPanel>
+                <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="{x:Bind Glyph}" Label="{x:Bind Title, Mode=OneWay}" FontWeight="SemiBold"
+                                 TrailingGlyph="{x:Bind Chevron, Mode=OneWay}" IsActive="{x:Bind IsActive, Mode=OneWay}" IsOpen="{x:Bind IsOpen, Mode=OneWay}"
+                                 IsCompact="{x:Bind IsCompact, Mode=OneWay}" Click="OnCategoryClick" />
+                <ItemsControl ItemsSource="{x:Bind Pages}" Margin="19,2,0,4" IsTabStop="False" Visibility="{x:Bind services:Format.Visible(ShowPages), Mode=OneWay}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:NavPage">
+                      <Grid ColumnSpacing="9">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="2" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Width="1" Fill="{ThemeResource NiskalaNavGuideBrush}" />
+                        <Rectangle Width="2" Margin="0,8" RadiusX="1" RadiusY="1" Fill="{ThemeResource NiskalaAccentBrush}" Visibility="{x:Bind services:Format.Visible(IsSelected), Mode=OneWay}" />
+                        <views:NavButton Grid.Column="1" Margin="0,1" Style="{StaticResource NavPageStyle}" Glyph="{x:Bind Glyph}" Label="{x:Bind Title, Mode=OneWay}"
+                                         IsActive="{x:Bind IsSelected, Mode=OneWay}" Click="OnPageClick" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="2" Spacing="2" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0" XYFocusKeyboardNavigation="Enabled">
+        <Grid>
+          <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="{x:Bind Nav.Updates.Glyph}" Label="{x:Bind Nav.Updates.Title, Mode=OneWay}"
+                           IsActive="{x:Bind Nav.Updates.IsSelected, Mode=OneWay}" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Click="OnUpdatesClick" />
+          <InfoBadge Style="{ThemeResource AttentionDotInfoBadgeStyle}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="26,7,0,0" IsHitTestVisible="False"
+                     Visibility="{x:Bind services:Format.Visible(Updates.IsAvailable), Mode=OneWay}" />
+        </Grid>
+        <views:NavButton x:Name="ThemeButton" Style="{StaticResource NavButtonStyle}" Glyph="&#xE706;" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Click="OnThemeClick" />
+        <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="&#xE774;" Label="{x:Bind S.SwitchLanguage}" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Click="OnLanguageClick" />
+      </StackPanel>
+    </Grid>
+
+    <Border x:Name="PageHost" Grid.Column="1" Background="{ThemeResource NiskalaBackgroundBrush}" CornerRadius="8,0,0,0" />
+
+    <Popup x:Name="PalettePopup" Grid.ColumnSpan="2" IsLightDismissEnabled="True" IsOpen="{x:Bind Palette.IsOpen, Mode=TwoWay}" Opened="OnPaletteOpened">
       <Border x:Name="PaletteCard" Width="600" MaxHeight="460" Background="{ThemeResource NiskalaSurfaceRaisedBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}"
               BorderThickness="1" CornerRadius="12" Padding="8">
         <Grid RowSpacing="6">

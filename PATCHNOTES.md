@@ -2,6 +2,20 @@
 
 Changes in each release of Niskala Utilities, newest first.
 
+## v0.1.2 (2026-11-27)
+
+### Changed
+
+- **Rail categories.** Apps, Cleaning, Performance and Maintenance are now items with their own icon that open and close their pages with a click. The category of the page on screen opens by default and carries an accent pill; another category you open gets a neutral pill. Its pages sit indented beside a thin guide line, and the page on screen is marked on that line.
+- Opening a page from `Ctrl+K` or from another page opens its category and highlights the page.
+- The rail is tighter: with all four categories open it fits a window of the default size without a scroll bar. The menu button still folds it to icons, and a category's icon then lists its pages in a menu.
+- Switching the language keeps the page on screen and the categories that are open.
+- **Dimmed list behind the uninstall panel.** While an uninstall, Force Remove, Steam or Batch Remove panel is open, a dark layer covers the app list behind it.
+
+### Fixed
+
+- The theme button in the rail names the right theme after the theme is switched from the command palette.
+
 ## v0.1.1 (2026-11-27)
 
 ### Added

@@ -19,126 +19,129 @@
       </Border>
     </SplitView.Pane>
 
-    <Grid Padding="28,4,28,0" RowSpacing="14">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="*" />
-      </Grid.RowDefinitions>
+    <Grid>
+      <Grid Padding="28,4,28,0" RowSpacing="14">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-      <Grid ColumnSpacing="10">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <StackPanel VerticalAlignment="Center">
-          <TextBlock Text="{x:Bind ViewModel.S.AppsTitle}" Style="{StaticResource PageTitleStyle}" />
-          <TextBlock Text="{x:Bind ViewModel.Summary, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" />
-        </StackPanel>
-        <TextBox Grid.Column="1" Width="260" VerticalAlignment="Center" PlaceholderText="{x:Bind ViewModel.S.AppsSearch}"
-                 Text="{x:Bind ViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-        <DropDownButton Grid.Column="2" VerticalAlignment="Center" Content="{x:Bind ViewModel.S.SortBy}">
-          <DropDownButton.Flyout>
-            <MenuFlyout Placement="BottomEdgeAlignedRight">
-              <MenuFlyoutItem Text="{x:Bind ViewModel.S.SortName}" Tag="Name" Click="OnSortClick" />
-              <MenuFlyoutItem Text="{x:Bind ViewModel.S.SortSize}" Tag="Size" Click="OnSortClick" />
-              <MenuFlyoutItem Text="{x:Bind ViewModel.S.SortDate}" Tag="Date" Click="OnSortClick" />
-            </MenuFlyout>
-          </DropDownButton.Flyout>
-        </DropDownButton>
-        <Button Grid.Column="3" VerticalAlignment="Center" Command="{x:Bind ViewModel.LoadCommand}" ToolTipService.ToolTip="{x:Bind ViewModel.S.Refresh}">
-          <FontIcon Glyph="&#xE72C;" FontSize="14" />
-        </Button>
-      </Grid>
-
-      <Grid Grid.Row="1" ColumnSpacing="10">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <ToggleButton Style="{StaticResource ChipStyle}" Tag="All" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsAll, Mode=OneWay}">
-            <TextBlock><Run Text="{x:Bind ViewModel.S.FilterAll}" /> <Run Text="{x:Bind ViewModel.CountAll, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
-          </ToggleButton>
-          <ToggleButton Style="{StaticResource ChipStyle}" Tag="Win32" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsWin32, Mode=OneWay}">
-            <TextBlock><Run Text="{x:Bind ViewModel.S.FilterWin32}" /> <Run Text="{x:Bind ViewModel.CountWin32, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
-          </ToggleButton>
-          <ToggleButton Style="{StaticResource ChipStyle}" Tag="Store" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsStore, Mode=OneWay}">
-            <TextBlock><Run Text="{x:Bind ViewModel.S.FilterStore}" /> <Run Text="{x:Bind ViewModel.CountStore, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
-          </ToggleButton>
-          <ToggleButton Style="{StaticResource ChipStyle}" Tag="Large" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsLarge, Mode=OneWay}">
-            <TextBlock><Run Text="{x:Bind ViewModel.S.FilterLarge}" /> <Run Text="{x:Bind ViewModel.CountLarge, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
-          </ToggleButton>
-          <ToggleButton Style="{StaticResource ChipStyle}" Tag="Recent" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsRecent, Mode=OneWay}">
-            <TextBlock><Run Text="{x:Bind ViewModel.S.FilterRecent}" /> <Run Text="{x:Bind ViewModel.CountRecent, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
-          </ToggleButton>
-          <ToggleButton Style="{StaticResource ChipStyle}" Tag="Broken" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsBroken, Mode=OneWay}">
-            <TextBlock><Run Text="{x:Bind ViewModel.S.FilterBroken}" /> <Run Text="{x:Bind ViewModel.CountBroken, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
-          </ToggleButton>
-        </StackPanel>
-        <Button Grid.Column="1" VerticalAlignment="Center" Content="{x:Bind ViewModel.S.ClearSelection}" Command="{x:Bind ViewModel.ClearChecksCommand}"
-                Visibility="{x:Bind services:Format.Visible(ViewModel.HasChecked), Mode=OneWay}" />
-        <Button Grid.Column="2" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.BatchRemoveCommand}"
-                Visibility="{x:Bind services:Format.Visible(ViewModel.CanBatch), Mode=OneWay}">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <FontIcon Glyph="&#xE74D;" FontSize="14" />
-            <TextBlock Text="{x:Bind ViewModel.BatchLabel, Mode=OneWay}" />
+        <Grid ColumnSpacing="10">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{x:Bind ViewModel.S.AppsTitle}" Style="{StaticResource PageTitleStyle}" />
+            <TextBlock Text="{x:Bind ViewModel.Summary, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" />
           </StackPanel>
-        </Button>
-      </Grid>
-
-      <InfoBar Grid.Row="2" Severity="Error" IsClosable="True" Message="{x:Bind ViewModel.Error, Mode=OneWay}"
-               IsOpen="{x:Bind services:Format.HasText(ViewModel.Error), Mode=OneWay}" />
-
-      <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="4" CornerRadius="10,10,0,0" BorderThickness="1,1,1,0">
-        <Grid>
-          <ListView x:Name="List" ItemsSource="{x:Bind ViewModel.Visible, Mode=OneWay}" IsItemClickEnabled="True" SelectionMode="None"
-                    ItemClick="{x:Bind ViewModel.OnItemClick}" ContainerContentChanging="OnContainerContentChanging">
-            <ListView.ItemTemplate>
-              <DataTemplate x:DataType="vm:AppItem">
-                <Grid Height="58" ColumnSpacing="14" Padding="6,0">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="32" />
-                    <ColumnDefinition Width="40" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="80" />
-                    <ColumnDefinition Width="96" />
-                    <ColumnDefinition Width="104" />
-                  </Grid.ColumnDefinitions>
-                  <CheckBox MinWidth="0" VerticalAlignment="Center" IsChecked="{x:Bind IsChecked, Mode=TwoWay}" IsEnabled="{x:Bind CanBatch}"
-                            AutomationProperties.Name="{x:Bind Name}" />
-                  <Grid Grid.Column="1" Width="40" Height="40">
-                    <Border CornerRadius="8" Background="{ThemeResource NiskalaPlateBrush}" Visibility="{x:Bind services:Format.Visible(IsStore)}" />
-                    <Border CornerRadius="8" Background="{x:Bind PlateBrush}" />
-                    <TextBlock Text="{x:Bind Initial}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"
-                               Foreground="{ThemeResource NiskalaFaintBrush}" Visibility="{x:Bind services:Format.Collapsed(HasIcon), Mode=OneWay}" />
-                    <Image Source="{x:Bind Icon, Mode=OneWay}" Width="32" Height="32" />
-                  </Grid>
-                  <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="{x:Bind Name}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" />
-                  </StackPanel>
-                  <Border Grid.Column="3" Style="{StaticResource PillStyle}" HorizontalAlignment="Left">
-                    <TextBlock Text="{x:Bind SourceText}" Style="{StaticResource CaptionMutedStyle}" />
-                  </Border>
-                  <TextBlock Grid.Column="4" Text="{x:Bind SizeText, Mode=OneWay}" VerticalAlignment="Center" HorizontalAlignment="Right" Style="{StaticResource CaptionTextBlockStyle}" />
-                  <TextBlock Grid.Column="5" Text="{x:Bind InstalledText}" VerticalAlignment="Center" HorizontalAlignment="Right" Style="{StaticResource CaptionMutedStyle}" />
-                </Grid>
-              </DataTemplate>
-            </ListView.ItemTemplate>
-          </ListView>
-          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Visibility="{x:Bind services:Format.Visible(ViewModel.IsLoading), Mode=OneWay}">
-            <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
-            <TextBlock Text="{x:Bind ViewModel.S.AppsLoading}" Style="{StaticResource MutedTextStyle}" />
-          </StackPanel>
-          <TextBlock Text="{x:Bind ViewModel.S.AppsEmpty}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                     Visibility="{x:Bind services:Format.Visible(ViewModel.IsEmpty), Mode=OneWay}" />
+          <TextBox Grid.Column="1" Width="260" VerticalAlignment="Center" PlaceholderText="{x:Bind ViewModel.S.AppsSearch}"
+                   Text="{x:Bind ViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+          <DropDownButton Grid.Column="2" VerticalAlignment="Center" Content="{x:Bind ViewModel.S.SortBy}">
+            <DropDownButton.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuFlyoutItem Text="{x:Bind ViewModel.S.SortName}" Tag="Name" Click="OnSortClick" />
+                <MenuFlyoutItem Text="{x:Bind ViewModel.S.SortSize}" Tag="Size" Click="OnSortClick" />
+                <MenuFlyoutItem Text="{x:Bind ViewModel.S.SortDate}" Tag="Date" Click="OnSortClick" />
+              </MenuFlyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+          <Button Grid.Column="3" VerticalAlignment="Center" Command="{x:Bind ViewModel.LoadCommand}" ToolTipService.ToolTip="{x:Bind ViewModel.S.Refresh}">
+            <FontIcon Glyph="&#xE72C;" FontSize="14" />
+          </Button>
         </Grid>
-      </Border>
+
+        <Grid Grid.Row="1" ColumnSpacing="10">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ToggleButton Style="{StaticResource ChipStyle}" Tag="All" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsAll, Mode=OneWay}">
+              <TextBlock><Run Text="{x:Bind ViewModel.S.FilterAll}" /> <Run Text="{x:Bind ViewModel.CountAll, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
+            </ToggleButton>
+            <ToggleButton Style="{StaticResource ChipStyle}" Tag="Win32" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsWin32, Mode=OneWay}">
+              <TextBlock><Run Text="{x:Bind ViewModel.S.FilterWin32}" /> <Run Text="{x:Bind ViewModel.CountWin32, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
+            </ToggleButton>
+            <ToggleButton Style="{StaticResource ChipStyle}" Tag="Store" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsStore, Mode=OneWay}">
+              <TextBlock><Run Text="{x:Bind ViewModel.S.FilterStore}" /> <Run Text="{x:Bind ViewModel.CountStore, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
+            </ToggleButton>
+            <ToggleButton Style="{StaticResource ChipStyle}" Tag="Large" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsLarge, Mode=OneWay}">
+              <TextBlock><Run Text="{x:Bind ViewModel.S.FilterLarge}" /> <Run Text="{x:Bind ViewModel.CountLarge, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
+            </ToggleButton>
+            <ToggleButton Style="{StaticResource ChipStyle}" Tag="Recent" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsRecent, Mode=OneWay}">
+              <TextBlock><Run Text="{x:Bind ViewModel.S.FilterRecent}" /> <Run Text="{x:Bind ViewModel.CountRecent, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
+            </ToggleButton>
+            <ToggleButton Style="{StaticResource ChipStyle}" Tag="Broken" Click="OnChipClick" IsChecked="{x:Bind ViewModel.IsBroken, Mode=OneWay}">
+              <TextBlock><Run Text="{x:Bind ViewModel.S.FilterBroken}" /> <Run Text="{x:Bind ViewModel.CountBroken, Mode=OneWay}" Foreground="{ThemeResource NiskalaFaintBrush}" /></TextBlock>
+            </ToggleButton>
+          </StackPanel>
+          <Button Grid.Column="1" VerticalAlignment="Center" Content="{x:Bind ViewModel.S.ClearSelection}" Command="{x:Bind ViewModel.ClearChecksCommand}"
+                  Visibility="{x:Bind services:Format.Visible(ViewModel.HasChecked), Mode=OneWay}" />
+          <Button Grid.Column="2" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.BatchRemoveCommand}"
+                  Visibility="{x:Bind services:Format.Visible(ViewModel.CanBatch), Mode=OneWay}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE74D;" FontSize="14" />
+              <TextBlock Text="{x:Bind ViewModel.BatchLabel, Mode=OneWay}" />
+            </StackPanel>
+          </Button>
+        </Grid>
+
+        <InfoBar Grid.Row="2" Severity="Error" IsClosable="True" Message="{x:Bind ViewModel.Error, Mode=OneWay}"
+                 IsOpen="{x:Bind services:Format.HasText(ViewModel.Error), Mode=OneWay}" />
+
+        <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="4" CornerRadius="10,10,0,0" BorderThickness="1,1,1,0">
+          <Grid>
+            <ListView x:Name="List" ItemsSource="{x:Bind ViewModel.Visible, Mode=OneWay}" IsItemClickEnabled="True" SelectionMode="None"
+                      ItemClick="{x:Bind ViewModel.OnItemClick}" ContainerContentChanging="OnContainerContentChanging">
+              <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:AppItem">
+                  <Grid Height="58" ColumnSpacing="14" Padding="6,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="32" />
+                      <ColumnDefinition Width="40" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="80" />
+                      <ColumnDefinition Width="96" />
+                      <ColumnDefinition Width="104" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox MinWidth="0" VerticalAlignment="Center" IsChecked="{x:Bind IsChecked, Mode=TwoWay}" IsEnabled="{x:Bind CanBatch}"
+                              AutomationProperties.Name="{x:Bind Name}" />
+                    <Grid Grid.Column="1" Width="40" Height="40">
+                      <Border CornerRadius="8" Background="{ThemeResource NiskalaPlateBrush}" Visibility="{x:Bind services:Format.Visible(IsStore)}" />
+                      <Border CornerRadius="8" Background="{x:Bind PlateBrush}" />
+                      <TextBlock Text="{x:Bind Initial}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"
+                                 Foreground="{ThemeResource NiskalaFaintBrush}" Visibility="{x:Bind services:Format.Collapsed(HasIcon), Mode=OneWay}" />
+                      <Image Source="{x:Bind Icon, Mode=OneWay}" Width="32" Height="32" />
+                    </Grid>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                      <TextBlock Text="{x:Bind Name}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <Border Grid.Column="3" Style="{StaticResource PillStyle}" HorizontalAlignment="Left">
+                      <TextBlock Text="{x:Bind SourceText}" Style="{StaticResource CaptionMutedStyle}" />
+                    </Border>
+                    <TextBlock Grid.Column="4" Text="{x:Bind SizeText, Mode=OneWay}" VerticalAlignment="Center" HorizontalAlignment="Right" Style="{StaticResource CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Column="5" Text="{x:Bind InstalledText}" VerticalAlignment="Center" HorizontalAlignment="Right" Style="{StaticResource CaptionMutedStyle}" />
+                  </Grid>
+                </DataTemplate>
+              </ListView.ItemTemplate>
+            </ListView>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Visibility="{x:Bind services:Format.Visible(ViewModel.IsLoading), Mode=OneWay}">
+              <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
+              <TextBlock Text="{x:Bind ViewModel.S.AppsLoading}" Style="{StaticResource MutedTextStyle}" />
+            </StackPanel>
+            <TextBlock Text="{x:Bind ViewModel.S.AppsEmpty}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Visibility="{x:Bind services:Format.Visible(ViewModel.IsEmpty), Mode=OneWay}" />
+          </Grid>
+        </Border>
+      </Grid>
+      <Rectangle Fill="{ThemeResource NiskalaScrimBrush}" IsHitTestVisible="False" Visibility="{x:Bind services:Format.Visible(ViewModel.Inspector.ShowScrim), Mode=OneWay}" />
     </Grid>
   </SplitView>
 </UserControl>

@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Niskala.UI.Services;
 using Niskala.UI.ViewModels;
@@ -18,57 +19,73 @@ public sealed partial class ShellView : UserControl
     {
         _services = services;
         InitializeComponent();
-        ThemeItem.Content = Application.Current is App { Theme: ElementTheme.Light } ? S.ThemeDark : S.ThemeLight;
-        services.SectionRequested += Select;
-        Unloaded += (_, _) => services.SectionRequested -= Select;
-        Navigation.SelectedItem = AppsItem;
+        LabelThemeButton();
+        Nav.Shown += Show;
+        services.ThemeToggleRequested += LabelThemeButton;
+        Unloaded += (_, _) =>
+        {
+            Nav.Shown -= Show;
+            services.ThemeToggleRequested -= LabelThemeButton;
+        };
+        Show(Nav.Selected);
     }
 
     public Strings S => Strings.Current;
+
+    public NavigationViewModel Nav => _services.Navigation;
 
     public PaletteViewModel Palette => _services.Palette;
 
     public UpdatesViewModel Updates => _services.Updates;
 
-    private void Select(Section section) => Navigation.SelectedItem = section switch
-    {
-        Section.Tracker => TrackerItem,
-        Section.Picker => PickerItem,
-        Section.QuickScan => QuickScanItem,
-        Section.SelectiveClean => SelectiveCleanItem,
-        Section.Registry => RegistryItem,
-        Section.Resources => ResourcesItem,
-        Section.Suspend => SuspendItem,
-        Section.Storage => StorageItem,
-        Section.Duplicates => DuplicatesItem,
-        Section.Wipe => WipeItem,
-        Section.Repair => RepairItem,
-        Section.History => HistoryItem,
-        Section.Updates => UpdatesItem,
-        _ => AppsItem,
-    };
+    private void OnPaneToggleClick(object sender, RoutedEventArgs e) => Nav.TogglePane();
 
-    private void OnSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    private void OnCategoryClick(object sender, RoutedEventArgs e)
     {
-        if (args.SelectedItem is NavigationViewItem { Tag: string tag } && Enum.TryParse(tag, out Section section))
+        if (sender is not FrameworkElement { DataContext: NavCategory category } button)
         {
-            Show(section);
+            return;
+        }
+
+        if (Nav.IsPaneOpen)
+        {
+            Nav.Toggle(category);
+            return;
+        }
+
+        var flyout = new MenuFlyout { Placement = FlyoutPlacementMode.RightEdgeAlignedTop };
+        flyout.Items.Add(new MenuFlyoutItem { Text = category.Title, IsEnabled = false });
+        foreach (NavPage page in category.Pages)
+        {
+            var item = new RadioMenuFlyoutItem
+            {
+                Text = page.Title,
+                Icon = new FontIcon { Glyph = page.Glyph },
+                GroupName = category.Group.ToString(),
+                IsChecked = page.IsSelected,
+            };
+            item.Click += (_, _) => Nav.Select(page.Section);
+            flyout.Items.Add(item);
+        }
+
+        flyout.ShowAt(button);
+    }
+
+    private void OnPageClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: NavPage page })
+        {
+            Nav.Select(page.Section);
         }
     }
 
-    private void OnItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
-    {
-        switch ((args.InvokedItemContainer as NavigationViewItem)?.Tag as string)
-        {
-            case "Theme":
-                _services.ToggleTheme();
-                ThemeItem.Content = Application.Current is App { Theme: ElementTheme.Light } ? S.ThemeDark : S.ThemeLight;
-                break;
-            case "Language":
-                _services.ToggleLanguage();
-                break;
-        }
-    }
+    private void OnUpdatesClick(object sender, RoutedEventArgs e) => Nav.Select(Section.Updates);
+
+    private void OnThemeClick(object sender, RoutedEventArgs e) => _services.ToggleTheme();
+
+    private void OnLanguageClick(object sender, RoutedEventArgs e) => _services.ToggleLanguage();
+
+    private void LabelThemeButton() => ThemeButton.Label = Application.Current is App { Theme: ElementTheme.Light } ? S.ThemeDark : S.ThemeLight;
 
     private void Show(Section section)
     {
