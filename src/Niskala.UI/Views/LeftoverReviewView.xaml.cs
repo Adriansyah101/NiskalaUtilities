@@ -1,15 +1,26 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml.Controls;
+using Niskala.UI.Services;
 using Niskala.UI.ViewModels;
 
 namespace Niskala.UI.Views;
 
 public sealed partial class LeftoverReviewView : UserControl
 {
+    private readonly Attachment _events;
+
     public LeftoverReviewView()
     {
+        _events = new Attachment(
+            () => ViewModel.PropertyChanged += OnViewModelChanged,
+            () => ViewModel.PropertyChanged -= OnViewModelChanged);
         InitializeComponent();
-        Loaded += (_, _) => ShowTab();
+        Loaded += (_, _) =>
+        {
+            _events.Attach();
+            ShowTab();
+        };
+        Unloaded += (_, _) => _events.Detach();
     }
 
     public LeftoverReviewViewModel ViewModel
@@ -17,9 +28,13 @@ public sealed partial class LeftoverReviewView : UserControl
         get;
         set
         {
-            field.PropertyChanged -= OnViewModelChanged;
+            bool attached = _events.Detach();
             field = value;
-            field.PropertyChanged += OnViewModelChanged;
+            if (attached || IsLoaded)
+            {
+                _events.Attach();
+            }
+
             Bindings.Update();
             ShowTab();
         }

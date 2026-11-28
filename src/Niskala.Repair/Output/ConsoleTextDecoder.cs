@@ -29,6 +29,12 @@ internal sealed class ConsoleTextDecoder(int oemCodePage)
 
     public string Finish() => Decode([], flush: true);
 
+    public void DecodeInto(ReadOnlySpan<byte> bytes, ConsoleLineAssembler assembler, List<ConsoleLine> lines) =>
+        DecodeInto(bytes, flush: false, assembler, lines);
+
+    public void FinishInto(ConsoleLineAssembler assembler, List<ConsoleLine> lines) =>
+        DecodeInto([], flush: true, assembler, lines);
+
     internal static Encoding OemEncoding(int codePage) => codePage switch
     {
         Utf8CodePage => new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
@@ -52,27 +58,46 @@ internal sealed class ConsoleTextDecoder(int oemCodePage)
 
     private string Decode(ReadOnlySpan<byte> bytes, bool flush)
     {
-        if (_decoder is null)
+        var text = new StringBuilder();
+        Decode(bytes, flush, text, static (chars, sink) => sink.Append(chars));
+        return text.ToString();
+    }
+
+    private void DecodeInto(ReadOnlySpan<byte> bytes, bool flush, ConsoleLineAssembler assembler, List<ConsoleLine> lines)
+    {
+        ArgumentNullException.ThrowIfNull(assembler);
+        Decode(bytes, flush, (assembler, lines), static (chars, sink) => sink.assembler.Append(chars, sink.lines));
+    }
+
+    private void Decode<TSink>(ReadOnlySpan<byte> bytes, bool flush, TSink sink, CharSink<TSink> emit)
+    {
+        if (_decoder is not null)
         {
-            _held.AddRange(bytes);
-            if (_held.Count < DetectionBytes && !flush)
-            {
-                return string.Empty;
-            }
-
-            byte[] sample = [.. _held];
-            _held.Clear();
-            if (sample.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            Detected = Detect(sample);
-            _decoder = Choose(Detected).GetDecoder();
-            return Convert(Skip(sample, Detected), flush);
+            Convert(bytes, flush, sink, emit);
+            return;
         }
 
-        return Convert(bytes, flush);
+        _held.AddRange(bytes);
+        if ((!flush && (_held.Count < DetectionBytes || IsPartialUtf8Mark(_held))) || _held.Count == 0)
+        {
+            return;
+        }
+
+        byte[] sample = ArrayPool<byte>.Shared.Rent(_held.Count);
+        int length = _held.Count;
+        try
+        {
+            _held.CopyTo(sample);
+            _held.Clear();
+            ReadOnlySpan<byte> head = sample.AsSpan(0, length);
+            Detected = Detect(head);
+            _decoder = Choose(Detected).GetDecoder();
+            Convert(Skip(head, Detected), flush, sink, emit);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(sample);
+        }
     }
 
     private Encoding Choose(ConsoleEncoding encoding) => encoding switch
@@ -89,18 +114,41 @@ internal sealed class ConsoleTextDecoder(int oemCodePage)
         _ => sample,
     };
 
-    private string Convert(ReadOnlySpan<byte> bytes, bool flush)
+    private void Convert<TSink>(ReadOnlySpan<byte> bytes, bool flush, TSink sink, CharSink<TSink> emit)
     {
         char[] chars = ArrayPool<char>.Shared.Rent(Math.Max(1, _decoder!.GetCharCount(bytes, flush)));
         try
         {
             int written = _decoder.GetChars(bytes, chars, flush);
-            return new string(chars, 0, written);
+            if (written > 0)
+            {
+                emit(chars.AsSpan(0, written), sink);
+            }
         }
         finally
         {
             ArrayPool<char>.Shared.Return(chars);
         }
+    }
+
+    private delegate void CharSink<in TSink>(ReadOnlySpan<char> chars, TSink sink);
+
+    private static bool IsPartialUtf8Mark(List<byte> held)
+    {
+        if (held.Count >= Utf8Mark.Length)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < held.Count; i++)
+        {
+            if (held[i] != Utf8Mark[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsMultibyteUtf8(ReadOnlySpan<byte> sample)

@@ -10,3 +10,4 @@ TestResults/
 *.tar
 *.log
 *.bak
+docs/internal/

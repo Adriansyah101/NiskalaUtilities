@@ -81,7 +81,10 @@ public sealed partial class MainWindow : Window
             FitTitleBar();
             UpdatePassthrough();
         };
-        Root.Loaded += (_, _) => Root.XamlRoot.Changed += (_, _) => ApplyMinimum(WorkArea(), WindowNative.Scale(_handle));
+        var rootChanges = new Attachment(
+            () => Root.XamlRoot.Changed += OnRootChanged,
+            () => Root.XamlRoot.Changed -= OnRootChanged);
+        Root.Loaded += (_, _) => rootChanges.Attach();
         services.ThemeToggleRequested += ToggleTheme;
         services.LanguageToggleRequested += ToggleLanguage;
         _promptTimer = DispatcherQueue.CreateTimer();
@@ -160,6 +163,8 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnLauncherClick(object sender, RoutedEventArgs e) => _services.Palette.Open();
+
+    private void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => ApplyMinimum(WorkArea(), WindowNative.Scale(_handle));
 
     private PixelRect WorkArea()
     {

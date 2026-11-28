@@ -46,6 +46,7 @@ public sealed partial class DriveMapView : Grid
     private Func<int, ClusterState[]>? _source;
     private WriteableBitmap? _bitmap;
     private byte[] _pixels = [];
+    private XamlRoot? _root;
 
     public DriveMapView()
     {
@@ -54,19 +55,13 @@ public sealed partial class DriveMapView : Grid
         ActualThemeChanged += (_, _) => Render();
         Loaded += (_, _) =>
         {
-            if (XamlRoot is { } root)
-            {
-                root.Changed += OnRootChanged;
-            }
-
+            Watch(XamlRoot);
             Render();
         };
         Unloaded += (_, _) =>
         {
-            if (XamlRoot is { } root)
-            {
-                root.Changed -= OnRootChanged;
-            }
+            Watch(null);
+            Release();
         };
     }
 
@@ -103,7 +98,39 @@ public sealed partial class DriveMapView : Grid
     public void Show(Func<int, ClusterState[]>? source)
     {
         _source = source;
+        if (source is null)
+        {
+            Release();
+            return;
+        }
+
         Render();
+    }
+
+    private void Watch(XamlRoot? root)
+    {
+        if (ReferenceEquals(root, _root))
+        {
+            return;
+        }
+
+        if (_root is not null)
+        {
+            _root.Changed -= OnRootChanged;
+        }
+
+        _root = root;
+        if (root is not null)
+        {
+            root.Changed += OnRootChanged;
+        }
+    }
+
+    private void Release()
+    {
+        _image.Source = null;
+        _bitmap = null;
+        _pixels = [];
     }
 
     private static DependencyProperty Register(string name) =>
@@ -127,7 +154,7 @@ public sealed partial class DriveMapView : Grid
         ClusterState[] states = grid.Cells > 0 && _source is { } source ? source(grid.Cells) : [];
         if (states.Length == 0)
         {
-            _image.Source = null;
+            Release();
             return;
         }
 

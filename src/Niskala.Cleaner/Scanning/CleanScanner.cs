@@ -122,8 +122,9 @@ public sealed class CleanScanner(ICleanEnvironment environment)
             }
 
             scanned.Add(new CleanFolder(real, target.Recurse, target.KeepFolders));
-            foreach (CleanFile file in Enumerate(real, target, rule.MinimumAge))
+            foreach (CleanFile file in Enumerate(real, target, rule.MinimumAge, cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (seen.Add(file.Path))
                 {
                     files.Add(file);
@@ -134,7 +135,7 @@ public sealed class CleanScanner(ICleanEnvironment environment)
         return new RulePreview(rule) { Files = files, Folders = scanned, Profiles = free, LockedProfiles = locked, Bytes = files.Sum(f => f.Bytes) };
     }
 
-    private IEnumerable<CleanFile> Enumerate(string folder, TargetDefinition target, TimeSpan minimumAge)
+    private IEnumerable<CleanFile> Enumerate(string folder, TargetDefinition target, TimeSpan minimumAge, CancellationToken cancellationToken)
     {
         DateTimeOffset now = environment.Now;
         var options = new EnumerationOptions
@@ -146,9 +147,18 @@ public sealed class CleanScanner(ICleanEnvironment environment)
         };
         return new FileSystemEnumerable<CleanFile>(folder, (ref FileSystemEntry entry) => new CleanFile(entry.ToFullPath(), entry.Length), options)
         {
-            ShouldIncludePredicate = (ref FileSystemEntry entry) => !entry.IsDirectory
-                && Matches(entry.FileName.ToString(), target.Files, target.Exclude)
-                && IsOldEnough(now, minimumAge, entry.LastWriteTimeUtc.UtcDateTime, entry.CreationTimeUtc.UtcDateTime),
+            ShouldIncludePredicate = (ref FileSystemEntry entry) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return !entry.IsDirectory
+                    && Matches(entry.FileName.ToString(), target.Files, target.Exclude)
+                    && IsOldEnough(now, minimumAge, entry.LastWriteTimeUtc.UtcDateTime, entry.CreationTimeUtc.UtcDateTime);
+            },
+            ShouldRecursePredicate = (ref FileSystemEntry entry) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return true;
+            },
         };
     }
 

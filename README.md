@@ -47,13 +47,13 @@ Windows 10 and 11 (x64, ARM64) · English & Bahasa Indonesia · Dark & Light The
 
 | File | What it is |
 |---|---|
-| `NiskalaUtilities-Setup-v0.3.1-win-x64.exe` | The official installer for 64-bit Windows 10 and 11 PCs (Intel / AMD), with a Start menu shortcut and an optional desktop shortcut. |
+| `NiskalaUtilities-Setup-v0.3.2-win-x64.exe` | The official installer for 64-bit Windows 10 and 11 PCs (Intel / AMD), with a Start menu shortcut and an optional desktop shortcut. |
 | `SHA256SUMS.txt` | The SHA-256 checksum of the installer, to verify that your download is the published file. |
 
 Compare the hash with the line in `SHA256SUMS.txt`:
 
 ```powershell
-(Get-FileHash .\NiskalaUtilities-Setup-v0.3.1-win-x64.exe -Algorithm SHA256).Hash
+(Get-FileHash .\NiskalaUtilities-Setup-v0.3.2-win-x64.exe -Algorithm SHA256).Hash
 ```
 
 > [!NOTE]

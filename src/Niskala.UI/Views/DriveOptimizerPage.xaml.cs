@@ -12,17 +12,25 @@ public sealed partial class DriveOptimizerPage : UserControl
         ViewModel = viewModel;
         InitializeComponent();
         SyncTab();
+        var events = new Attachment(
+            () =>
+            {
+                ViewModel.MapChanged += Redraw;
+                ViewModel.PropertyChanged += OnViewModelChanged;
+            },
+            () =>
+            {
+                ViewModel.MapChanged -= Redraw;
+                ViewModel.PropertyChanged -= OnViewModelChanged;
+                Map.Show(null);
+            });
         Loaded += (_, _) =>
         {
-            ViewModel.MapChanged += Redraw;
-            ViewModel.PropertyChanged += OnViewModelChanged;
+            events.Attach();
+            SyncTab();
             Map.Show(ViewModel.Summarize);
         };
-        Unloaded += (_, _) =>
-        {
-            ViewModel.MapChanged -= Redraw;
-            ViewModel.PropertyChanged -= OnViewModelChanged;
-        };
+        Unloaded += (_, _) => events.Detach();
     }
 
     public DriveOptimizerViewModel ViewModel { get; }

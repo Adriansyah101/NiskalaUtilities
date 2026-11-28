@@ -31,12 +31,34 @@ public abstract partial class TaskViewModel : ObservableObject, IDisposable
     private protected UiServices Services { get; }
 
     [RelayCommand]
-    public void Cancel() => _cancel?.Cancel();
+    public void Cancel() => Stop(_cancel);
 
     public virtual void Dispose()
     {
-        _cancel?.Cancel();
+        Stop(_cancel);
         GC.SuppressFinalize(this);
+    }
+
+    public static bool Stop(CancellationTokenSource? cancel)
+    {
+        if (cancel is null || cancel.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        try
+        {
+            cancel.Cancel();
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        catch (AggregateException)
+        {
+            return true;
+        }
     }
 
     private protected async Task RunAsync(Func<CancellationToken, Task> work)

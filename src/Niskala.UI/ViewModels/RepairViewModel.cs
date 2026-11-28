@@ -148,7 +148,7 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _clock.Stop();
-        _cancel?.Cancel();
+        TaskViewModel.Stop(_cancel);
     }
 
     public bool UseSource(string? path)
@@ -215,7 +215,7 @@ public sealed partial class RepairViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand(CanExecute = nameof(IsRunning))]
-    private void Cancel() => _cancel?.Cancel();
+    private void Cancel() => TaskViewModel.Stop(_cancel);
 
     private void Apply(RepairUpdate update)
     {

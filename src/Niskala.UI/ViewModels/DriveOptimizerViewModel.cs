@@ -105,6 +105,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     private readonly DispatcherQueueTimer _mapClock;
     private readonly Lazy<DriveOptimizer> _optimizer = new(NiskalaHost.CreateDriveOptimizer);
     private CancellationTokenSource? _cancel;
+    private int _run;
     private bool _moving;
     private DriveMap? _liveMap;
     private long _shownVersion = -1;
@@ -262,7 +263,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     {
         _clock.Stop();
         _mapClock.Stop();
-        _cancel?.Cancel();
+        TaskViewModel.Stop(_cancel);
     }
 
     private DriveMap? CurrentMap => IsRunning && _liveMap is not null ? _liveMap : CurrentAnalysis?.Map;
@@ -351,8 +352,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     [RelayCommand(CanExecute = nameof(IsRunning))]
     private void Cancel()
     {
-        _cancel?.Cancel();
-        if (_moving)
+        TaskViewModel.Stop(_cancel);
+        if (_moving && IsRunning)
         {
             ShowStopping();
         }
@@ -422,6 +423,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
 
         using var cancel = new CancellationTokenSource();
         _cancel = cancel;
+        _run++;
         Banner.Clear();
         Percent = 0;
         Activity = string.Empty;
@@ -554,16 +556,23 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
 
     private void CountChecked() => HasChecked = Fragments.Any(f => f.IsChecked);
 
-    private void Apply(DriveProgress progress)
+    public static bool IsCurrent(int run, int current, bool running) => running && run == current;
+
+    private void Apply(int run, DriveProgress progress)
     {
+        if (!IsCurrent(run, _run, IsRunning))
+        {
+            return;
+        }
+
         Percent = progress.Percent;
         Activity = S.DrivePhaseText(progress.Phase, progress.Current);
-        if (progress.Phase == DrivePhase.Stopping && IsRunning)
+        if (progress.Phase == DrivePhase.Stopping)
         {
             ShowStopping();
         }
 
-        if (progress.Map is { } map && IsRunning)
+        if (progress.Map is { } map)
         {
             _liveMap = map;
         }
@@ -573,6 +582,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
 
     private sealed class Sink(DriveOptimizerViewModel owner) : IProgress<DriveProgress>
     {
-        public void Report(DriveProgress value) => owner._services.Post(() => owner.Apply(value));
+        private readonly int _run = owner._run;
+
+        public void Report(DriveProgress value) => owner._services.Post(() => owner.Apply(_run, value));
     }
 }

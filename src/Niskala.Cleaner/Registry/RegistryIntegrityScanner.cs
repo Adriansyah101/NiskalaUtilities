@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -56,6 +57,9 @@ public sealed class RegistryIntegrityScanner(
 
     private const string InprocServer = "InprocServer32";
     private const string LocalServer = "LocalServer32";
+    private const int MaxParallelChecks = 4;
+
+    private readonly ConcurrentDictionary<string, bool> _fixedDrives = new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly HashSet<string> NonTypeKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -70,33 +74,40 @@ public sealed class RegistryIntegrityScanner(
     {
         long start = Stopwatch.GetTimestamp();
         kinds ??= AllKinds;
-        var issues = new List<IntegrityIssue>();
+        cancellationToken.ThrowIfCancellationRequested();
+        var checks = new List<Func<CancellationToken, IEnumerable<IntegrityIssue>>>();
         if (kinds.Contains(IntegrityIssueKind.FileAssociation))
         {
-            issues.AddRange(FileAssociations(cancellationToken));
+            checks.AddRange(locations.ClassesRoots.Select(root => (Func<CancellationToken, IEnumerable<IntegrityIssue>>)(token => FileAssociations(root, token))));
         }
 
         if (kinds.Contains(IntegrityIssueKind.SharedDll))
         {
-            issues.AddRange(SharedDlls());
+            checks.Add(SharedDlls);
         }
 
         if (kinds.Contains(IntegrityIssueKind.ComRegistration))
         {
-            issues.AddRange(ComRegistrations(cancellationToken));
+            checks.AddRange(locations.ClassesRoots.Select(root => (Func<CancellationToken, IEnumerable<IntegrityIssue>>)(token => ComRegistrations(root, token))));
         }
 
         if (kinds.Contains(IntegrityIssueKind.FirewallRule))
         {
-            issues.AddRange(FirewallRules());
+            checks.Add(_ => FirewallRules());
         }
 
         if (kinds.Contains(IntegrityIssueKind.ServicePath))
         {
-            issues.AddRange(ServicePaths());
+            checks.Add(ServicePaths);
         }
 
-        IReadOnlyList<IntegrityIssue> guarded = [.. issues.Select(Guarded)];
+        var found = new List<IntegrityIssue>[checks.Count];
+        Parallel.For(
+            0,
+            checks.Count,
+            new ParallelOptions { MaxDegreeOfParallelism = MaxParallelChecks, CancellationToken = cancellationToken },
+            i => found[i] = [.. checks[i](cancellationToken)]);
+        IReadOnlyList<IntegrityIssue> guarded = [.. found.SelectMany(f => f).Select(Guarded)];
         TimeSpan elapsed = Stopwatch.GetElapsedTime(start);
         CleanerLog.IntegrityScanned(logger, guarded.Count, elapsed);
         return new IntegrityReport(guarded, elapsed);
@@ -128,50 +139,48 @@ public sealed class RegistryIntegrityScanner(
         return decision is { IsAllowed: false } ? issue with { Protection = decision.ToString() } : issue;
     }
 
-    private IEnumerable<IntegrityIssue> FileAssociations(CancellationToken cancellationToken)
+    private IEnumerable<IntegrityIssue> FileAssociations(string root, CancellationToken cancellationToken)
     {
-        foreach (string root in locations.ClassesRoots)
+        using RegistryKey? classes = RegistryPath.OpenReadOnly(root);
+        if (classes is null)
         {
-            using RegistryKey? classes = RegistryPath.OpenReadOnly(root);
-            if (classes is null)
+            yield break;
+        }
+
+        bool wow = IsWow(root);
+        foreach (string name in classes.GetSubKeyNames())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (name.StartsWith('.'))
+            {
+                if (ReadDefault(classes, name) is { Length: > 0 } progId && !ProgIdExists(progId))
+                {
+                    yield return new IntegrityIssue(
+                        IntegrityIssueKind.FileAssociation, LeftoverKind.RegistryValue, $@"{root}\{name}", string.Empty, progId,
+                        $"{name} files open with {progId}, which is not registered");
+                }
+
+                continue;
+            }
+
+            if (NonTypeKeys.Contains(name) || name.StartsWith("AppX", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            bool wow = IsWow(root);
-            foreach (string name in classes.GetSubKeyNames())
+            foreach (IntegrityIssue issue in BrokenVerbs(classes, root, name, wow))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (name.StartsWith('.'))
-                {
-                    if (ReadDefault(classes, name) is { Length: > 0 } progId && !ProgIdExists(progId))
-                    {
-                        yield return new IntegrityIssue(
-                            IntegrityIssueKind.FileAssociation, LeftoverKind.RegistryValue, $@"{root}\{name}", string.Empty, progId,
-                            $"{name} files open with {progId}, which is not registered");
-                    }
-
-                    continue;
-                }
-
-                if (NonTypeKeys.Contains(name) || name.StartsWith("AppX", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                foreach (IntegrityIssue issue in BrokenVerbs(classes, root, name, wow))
-                {
-                    yield return issue;
-                }
+                yield return issue;
             }
+        }
 
-            using RegistryKey? applications = classes.OpenSubKey(ApplicationsKey);
-            foreach (string name in applications?.GetSubKeyNames() ?? [])
+        using RegistryKey? applications = OpenSubKey(classes, ApplicationsKey);
+        foreach (string name in applications?.GetSubKeyNames() ?? [])
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (IntegrityIssue issue in BrokenVerbs(classes, root, $@"{ApplicationsKey}\{name}", wow))
             {
-                foreach (IntegrityIssue issue in BrokenVerbs(classes, root, $@"{ApplicationsKey}\{name}", wow))
-                {
-                    yield return issue;
-                }
+                yield return issue;
             }
         }
     }
@@ -195,13 +204,14 @@ public sealed class RegistryIntegrityScanner(
         }
     }
 
-    private IEnumerable<IntegrityIssue> SharedDlls()
+    private IEnumerable<IntegrityIssue> SharedDlls(CancellationToken cancellationToken)
     {
         foreach (string keyPath in locations.SharedDllKeys)
         {
             using RegistryKey? key = RegistryPath.OpenReadOnly(keyPath);
             foreach (string name in key?.GetValueNames() ?? [])
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (name.Length > 0 && IsMissing(name, IsWow(keyPath)))
                 {
                     yield return new IntegrityIssue(IntegrityIssueKind.SharedDll, LeftoverKind.RegistryValue, keyPath, name, name, "a shared file reference to a file that is gone");
@@ -210,32 +220,29 @@ public sealed class RegistryIntegrityScanner(
         }
     }
 
-    private IEnumerable<IntegrityIssue> ComRegistrations(CancellationToken cancellationToken)
+    private IEnumerable<IntegrityIssue> ComRegistrations(string root, CancellationToken cancellationToken)
     {
-        foreach (string root in locations.ClassesRoots)
+        using RegistryKey? clsids = RegistryPath.OpenReadOnly($@"{root}\{ClsidKey}");
+        if (clsids is null)
         {
-            using RegistryKey? clsids = RegistryPath.OpenReadOnly($@"{root}\{ClsidKey}");
-            if (clsids is null)
+            yield break;
+        }
+
+        bool wow = IsWow(root);
+        foreach (string clsid in clsids.GetSubKeyNames())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Guid.TryParse(clsid, out _))
             {
                 continue;
             }
 
-            bool wow = IsWow(root);
-            foreach (string clsid in clsids.GetSubKeyNames())
+            using RegistryKey? entry = OpenSubKey(clsids, clsid);
+            if (entry is not null && MissingServer(entry, wow) is { } missing)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!Guid.TryParse(clsid, out _))
-                {
-                    continue;
-                }
-
-                using RegistryKey? entry = OpenSubKey(clsids, clsid);
-                if (entry is not null && MissingServer(entry, wow) is { } missing)
-                {
-                    yield return new IntegrityIssue(
-                        IntegrityIssueKind.ComRegistration, LeftoverKind.RegistryKey, $@"{root}\{ClsidKey}\{clsid}", null, missing,
-                        $"COM class {ReadDefault(entry, string.Empty) ?? clsid} is served by {missing}, which is gone");
-                }
+                yield return new IntegrityIssue(
+                    IntegrityIssueKind.ComRegistration, LeftoverKind.RegistryKey, $@"{root}\{ClsidKey}\{clsid}", null, missing,
+                    $"COM class {ReadDefault(entry, string.Empty) ?? clsid} is served by {missing}, which is gone");
             }
         }
     }
@@ -261,7 +268,7 @@ public sealed class RegistryIntegrityScanner(
         }
     }
 
-    private IEnumerable<IntegrityIssue> ServicePaths()
+    private IEnumerable<IntegrityIssue> ServicePaths(CancellationToken cancellationToken)
     {
         if (locations.ServicesKey is not { } servicesKey)
         {
@@ -271,6 +278,7 @@ public sealed class RegistryIntegrityScanner(
         using RegistryKey? services = RegistryPath.OpenReadOnly(servicesKey);
         foreach (string name in services?.GetSubKeyNames() ?? [])
         {
+            cancellationToken.ThrowIfCancellationRequested();
             using RegistryKey? service = OpenSubKey(services!, name);
             if (service?.GetValue("Type") is not int type || (type & ServiceWin32Types) == 0 || (type & ServiceUserTemplate) != 0)
             {
@@ -331,7 +339,7 @@ public sealed class RegistryIntegrityScanner(
             return false;
         }
 
-        if (Path.GetPathRoot(path) is not { Length: 3 } drive || !IsFixedDrive(drive))
+        if (Path.GetPathRoot(path) is not { Length: 3 } drive || !_fixedDrives.GetOrAdd(drive, IsFixedDrive))
         {
             return false;
         }

@@ -31,6 +31,14 @@ internal sealed class FakeDisk : IVolumeSystem
 
     public bool RecordsOutOfOrder { get; set; }
 
+    public bool DirectRecords { get; set; }
+
+    public int DirectRecordsError { get; set; }
+
+    public int DirectReads { get; private set; }
+
+    public HashSet<string> WithoutExtents { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public int FileTableReads { get; private set; }
 
     public List<long> RecordReads { get; } = [];
@@ -327,6 +335,40 @@ internal sealed class FakeDisk : IVolumeSystem
             }
 
             return 0;
+        }
+
+        public int ReadFileRecords(Action<FileRecord> record, Action<int>? progress, CancellationToken cancellationToken, out int damaged)
+        {
+            damaged = 0;
+            disk.DirectReads++;
+            if (!disk.DirectRecords)
+            {
+                return VolumeNative.ErrorNotSupported;
+            }
+
+            int emitted = 0;
+            foreach ((string path, long id) in disk._ids.OrderBy(p => p.Value))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!disk._entries.TryGetValue(path, out var entry) || disk.UnderLink(path))
+                {
+                    continue;
+                }
+
+                if (disk.DirectRecordsError != 0 && emitted > 0)
+                {
+                    return disk.DirectRecordsError;
+                }
+
+                FileAttributes attributes = (entry.Directory ? FileAttributes.Directory : FileAttributes.Archive) | (entry.Link ? FileAttributes.ReparsePoint : 0);
+                Extent[]? extents = disk.WithoutExtents.Contains(path) ? null
+                    : disk._files.TryGetValue(path, out long[]? map) ? [.. Extents(map)]
+                    : [];
+                record(new FileRecord(new MftRecord(id, disk.ParentId(path), attributes, Path.GetFileName(path)), entry.Size, entry.Written, extents));
+                progress?.Invoke(++emitted);
+            }
+
+            return disk.DirectRecordsError;
         }
 
         public int ReadRecord(long id, List<Extent> extents, out RecordFacts facts)

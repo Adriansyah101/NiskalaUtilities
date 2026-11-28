@@ -30,12 +30,13 @@ public sealed partial class RepairPage : UserControl
     {
         ViewModel = viewModel;
         InitializeComponent();
+        var events = new Attachment(() => ViewModel.LineAdded += ScrollToEnd, () => ViewModel.LineAdded -= ScrollToEnd);
         Loaded += (_, _) =>
         {
-            ViewModel.LineAdded += ScrollToEnd;
+            events.Attach();
             ScrollToEnd();
         };
-        Unloaded += (_, _) => ViewModel.LineAdded -= ScrollToEnd;
+        Unloaded += (_, _) => events.Detach();
     }
 
     public RepairViewModel ViewModel { get; }

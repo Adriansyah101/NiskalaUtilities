@@ -42,9 +42,10 @@ public sealed class DriveStoppingTests
     public void Cancel_during_a_move_shows_the_stopping_banner_until_the_run_ends()
     {
         string model = Repo.Read("src", "Niskala.UI", "ViewModels", "DriveOptimizerViewModel.cs");
-        Assert.Contains("_cancel?.Cancel();\r\n        if (_moving)\r\n        {\r\n            ShowStopping();", model, StringComparison.Ordinal);
+        Assert.Contains("TaskViewModel.Stop(_cancel);\r\n        if (_moving && IsRunning)\r\n        {\r\n            ShowStopping();", model, StringComparison.Ordinal);
         Assert.Contains("Banner.Show(InfoBarSeverity.Informational, S.DriveStopping);", model, StringComparison.Ordinal);
-        Assert.Contains("if (progress.Phase == DrivePhase.Stopping && IsRunning)", model, StringComparison.Ordinal);
+        Assert.Contains("if (!IsCurrent(run, _run, IsRunning))", model, StringComparison.Ordinal);
+        Assert.Contains("if (progress.Phase == DrivePhase.Stopping)", model, StringComparison.Ordinal);
         Assert.Contains("_moving = true;\r\n        DefragResult result = await _optimizer.Value.DefragmentAsync(", model, StringComparison.Ordinal);
         Assert.Contains("_moving = false;\r\n            IsStopping = false;", model, StringComparison.Ordinal);
     }

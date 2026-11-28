@@ -135,7 +135,7 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        _cancel?.Cancel();
+        TaskViewModel.Stop(_cancel);
         if (_updater.IsValueCreated)
         {
             _updater.Value.Dispose();
@@ -187,7 +187,7 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand(CanExecute = nameof(IsDownloading))]
-    private void Cancel() => _cancel?.Cancel();
+    private void Cancel() => TaskViewModel.Stop(_cancel);
 
     [RelayCommand]
     private void OpenPage()

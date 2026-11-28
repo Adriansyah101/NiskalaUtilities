@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Niskala.UI.Services;
 using Niskala.UI.ViewModels;
 
 namespace Niskala.UI.Views;
@@ -10,12 +11,13 @@ public sealed partial class UpdatesPage : UserControl
     {
         ViewModel = viewModel;
         InitializeComponent();
+        var events = new Attachment(() => viewModel.ReviewRequested += FocusApply, () => viewModel.ReviewRequested -= FocusApply);
         Loaded += (_, _) =>
         {
-            viewModel.ReviewRequested += FocusApply;
+            events.Attach();
             FocusApply();
         };
-        Unloaded += (_, _) => viewModel.ReviewRequested -= FocusApply;
+        Unloaded += (_, _) => events.Detach();
     }
 
     public UpdatesViewModel ViewModel { get; }

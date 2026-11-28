@@ -25,6 +25,8 @@ public sealed class FreeSpaceIndex
 
     public IEnumerable<FreeRun> Runs => _byStart;
 
+    public long DataEnd(long clusters) => _byStart.Count > 0 && _byStart.Max.End >= clusters ? _byStart.Max.Start : clusters;
+
     public static FreeSpaceIndex From(ClusterBitmap bitmap)
     {
         ArgumentNullException.ThrowIfNull(bitmap);

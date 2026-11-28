@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Niskala.UI.Services;
 using Niskala.UI.ViewModels;
 
 namespace Niskala.UI.Views;
@@ -16,12 +17,15 @@ public sealed partial class AppsPage : UserControl
         ViewModel = viewModel;
         InitializeComponent();
         SizeChanged += (_, _) => SizePane();
+        var events = new Attachment(
+            () => viewModel.Inspector.PropertyChanged += OnInspectorChanged,
+            () => viewModel.Inspector.PropertyChanged -= OnInspectorChanged);
         Loaded += (_, _) =>
         {
-            viewModel.Inspector.PropertyChanged += OnInspectorChanged;
+            events.Attach();
             SizePane();
         };
-        Unloaded += (_, _) => viewModel.Inspector.PropertyChanged -= OnInspectorChanged;
+        Unloaded += (_, _) => events.Detach();
     }
 
     public AppsViewModel ViewModel { get; }
@@ -66,7 +70,16 @@ public sealed partial class AppsPage : UserControl
 
     private void OnContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
     {
-        if (!args.InRecycleQueue && args.Item is AppItem item)
+        if (args.Item is not AppItem item)
+        {
+            return;
+        }
+
+        if (args.InRecycleQueue)
+        {
+            ViewModel.Recycled(item);
+        }
+        else
         {
             ViewModel.Realized(item);
         }

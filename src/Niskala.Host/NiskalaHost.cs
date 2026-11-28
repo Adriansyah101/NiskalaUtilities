@@ -246,7 +246,7 @@ public sealed class NiskalaHost : IDisposable
 
     public static DriveOptimizer CreateDriveOptimizer() => new(SystemVolumes.Instance);
 
-    public static SizeQueue CreateSizeQueue() => SizeQueue.Create(new DiskKindProbe());
+    public SizeQueue CreateSizeQueue() => SizeQueue.Create(new DiskKindProbe(), FolderSizeCache.Load(FolderSizeCache.DefaultFile, Logger<FolderSizeCache>()));
 
     public UpdateService CreateUpdateService() => new(Logger<UpdateService>());
 

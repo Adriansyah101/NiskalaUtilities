@@ -1,25 +1,42 @@
 using System.Collections.Specialized;
 using Microsoft.UI.Xaml.Controls;
+using Niskala.UI.Services;
 using Niskala.UI.ViewModels;
 
 namespace Niskala.UI.Views;
 
 public sealed partial class InspectorPanel : UserControl
 {
-    public InspectorPanel() => InitializeComponent();
+    private readonly Attachment _events;
+
+    public InspectorPanel()
+    {
+        _events = new Attachment(
+            () => ViewModel.Activity.CollectionChanged += OnActivityChanged,
+            () => ViewModel.Activity.CollectionChanged -= OnActivityChanged);
+        InitializeComponent();
+        Loaded += (_, _) =>
+        {
+            if (ViewModel is not null)
+            {
+                _events.Attach();
+            }
+        };
+        Unloaded += (_, _) => _events.Detach();
+    }
 
     public InspectorViewModel ViewModel
     {
         get;
         set
         {
-            if (field is not null)
+            bool attached = _events.Detach();
+            field = value;
+            if (attached || IsLoaded)
             {
-                field.Activity.CollectionChanged -= OnActivityChanged;
+                _events.Attach();
             }
 
-            field = value;
-            field.Activity.CollectionChanged += OnActivityChanged;
             Bindings.Update();
         }
     } = null!;

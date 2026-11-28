@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Niskala.Core.Models;
-using Niskala.Host;
+using Niskala.Scanner.Icons;
 using Niskala.Scanner.Inventory;
 using Niskala.Scanner.Sizing;
 using Niskala.UI.Services;
@@ -34,13 +34,17 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
 
     private readonly UiServices _services;
     private readonly Dictionary<string, long> _measured = new(StringComparer.OrdinalIgnoreCase);
-    private readonly SizeQueue _sizes = NiskalaHost.CreateSizeQueue();
+    private readonly SizeQueue _sizes;
+    private readonly IconScheduler _icons;
     private readonly HashSet<string> _checked = new(StringComparer.OrdinalIgnoreCase);
     private List<AppItem> _items = [];
+    private bool _disposed;
 
     internal AppsViewModel(UiServices services)
     {
         _services = services;
+        _sizes = services.Host.CreateSizeQueue();
+        _icons = new IconScheduler((app, token) => Task.Run(() => services.Icons.GetAsync(app, token), token));
         Inspector = new InspectorViewModel(services);
         _sizes.Measured += size => services.Post(() => OnMeasured(size));
     }
@@ -131,7 +135,12 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
         Error = string.Empty;
         try
         {
-            InventorySnapshot snapshot = await Task.Run(() => _services.Host.CreateInventoryCollector().Collect());
+            InventorySnapshot snapshot = await Task.Run(() => _services.Host.CreateInventoryCollector().CollectAsync());
+            if (_disposed)
+            {
+                return;
+            }
+
             Apply(snapshot.Apps);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -182,6 +191,11 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
         {
             foreach (AppItem item in pending)
             {
+                if (_disposed)
+                {
+                    return;
+                }
+
                 _sizes.Enqueue(new SizeRequest(item.Id, item.MeasurableFolder!));
             }
         });
@@ -201,6 +215,15 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
         {
             item.IconRequested = true;
             _ = LoadIconAsync(item);
+        }
+    }
+
+    public void Recycled(AppItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        if (item.Icon is null && _icons.Withdraw(item.Id))
+        {
+            item.IconRequested = false;
         }
     }
 
@@ -282,7 +305,21 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
         }
     }
 
-    public void Dispose() => _sizes.Dispose();
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _icons.Dispose();
+        _sizes.Dispose();
+        foreach (AppItem item in _items)
+        {
+            item.PropertyChanged -= OnItemChanged;
+        }
+    }
 
     partial void OnQueryChanged(string value) => Refilter();
 
@@ -354,7 +391,11 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
         string? file;
         try
         {
-            file = await _services.Icons.GetAsync(item.App);
+            file = await _icons.Request(item.App);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -362,7 +403,7 @@ public sealed partial class AppsViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (file is not null)
+        if (file is not null && !_disposed)
         {
             item.Icon = new BitmapImage(new Uri(file)) { DecodePixelWidth = IconDecodeSize, DecodePixelType = DecodePixelType.Logical };
         }

@@ -10,7 +10,7 @@ public enum MovePurpose
     Compact,
 }
 
-public readonly record struct PlannedMove(DriveFile File, MovePurpose Purpose, SpeedZone Zone);
+public readonly record struct PlannedMove(DriveFile File, MovePurpose Purpose, SpeedZone Zone, long Ceiling = long.MaxValue);
 
 public static class DefragPlanner
 {
@@ -35,6 +35,11 @@ public static class DefragPlanner
                     .Select(f => new PlannedMove(f, MovePurpose.Place, zone)));
             }
         }
+        else if (mode == DefragMode.Consolidate)
+        {
+            PlanConsolidation(analysis, movable, plan);
+            return plan;
+        }
         else
         {
             plan.AddRange(movable
@@ -56,6 +61,35 @@ public static class DefragPlanner
         return plan;
     }
 
+    public static long DataEnd(DriveAnalysis analysis)
+    {
+        ArgumentNullException.ThrowIfNull(analysis);
+        return analysis.Free.DataEnd(analysis.Bitmap.Clusters);
+    }
+
+    private static void PlanConsolidation(DriveAnalysis analysis, DriveFile[] movable, List<PlannedMove> plan)
+    {
+        long ceiling = DataEnd(analysis);
+        DriveFile[] fragmented = [.. movable.Where(f => f.IsFragmented).OrderBy(f => f.StartLcn)];
+        plan.AddRange(movable
+            .Where(f => !f.IsFragmented && f.Size <= CompactMaxBytes)
+            .OrderBy(f => f.StartLcn)
+            .Select(f => new PlannedMove(f, MovePurpose.Compact, f.Zone)));
+        if (fragmented.Length == 0)
+        {
+            return;
+        }
+
+        plan.AddRange(fragmented.Select(f => new PlannedMove(f, MovePurpose.Defragment, f.Zone, ceiling)));
+        long lowestHole = fragmented.Min(f => f.Extents.Where(e => !e.IsVirtual).Min(e => e.Lcn));
+        var joined = fragmented.ToHashSet();
+        plan.AddRange(movable
+            .Where(f => f.Size <= CompactMaxBytes && (joined.Contains(f) || f.StartLcn > lowestHole))
+            .OrderBy(f => f.StartLcn)
+            .Select(f => new PlannedMove(f, MovePurpose.Compact, f.Zone)));
+        plan.AddRange(fragmented.Select(f => new PlannedMove(f, MovePurpose.Defragment, f.Zone, ceiling)));
+    }
+
     public static long? Target(DriveAnalysis analysis, PlannedMove move, DefragMode mode)
     {
         ArgumentNullException.ThrowIfNull(analysis);
@@ -71,7 +105,7 @@ public static class DefragPlanner
         switch (move.Purpose)
         {
             case MovePurpose.Defragment:
-                return mode == DefragMode.Quick ? free.BestFit(clusters) : free.FirstFit(clusters);
+                return mode == DefragMode.Quick ? free.BestFit(clusters) : free.FirstFit(clusters, 0, move.Ceiling);
             case MovePurpose.Place:
                 (long from, long to) = layout.Range(move.Zone);
                 return free.FirstFit(clusters, from, to) ?? (file.IsFragmented ? free.BestFit(clusters) : null);
@@ -178,7 +212,7 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
         tally.Cancelled |= cancellationToken.IsCancellationRequested;
 
         progress?.Report(new DriveProgress(DrivePhase.Finished, 100, analysis.Volume.Name, analysis.Map.Version, analysis.Map));
-        return new DefragResult(mode, plan.Count, tally.Moved, tally.Defragmented, tally.Locked, tally.NoRoom, tally.Failed, tally.Clusters, tally.Cancelled, clock.Elapsed);
+        return new DefragResult(mode, plan.Select(p => p.File).Distinct().Count(), tally.Moved, tally.Defragmented, tally.Locked, tally.NoRoom, tally.Failed, tally.Clusters, tally.Cancelled, clock.Elapsed);
     }
 
     public static bool FinishesOnCancel(DriveFile file, long bytesPerCluster)
@@ -190,6 +224,16 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
     private static MoveOutcome Execute(IVolumeSession session, DriveAnalysis analysis, PlannedMove move, DefragMode mode, IoThrottleController controller, Tally tally, Action stopping, CancellationToken cancellationToken)
     {
         DriveFile file = move.File;
+        if (file.IsLocked)
+        {
+            return MoveOutcome.Locked;
+        }
+
+        if (move.Purpose == MovePurpose.Defragment && !file.IsFragmented)
+        {
+            return MoveOutcome.AlreadyPlaced;
+        }
+
         bool movedAny = false;
         for (int attempt = 0; attempt < Attempts; attempt++)
         {
@@ -374,16 +418,20 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
     private sealed class Tally
     {
         private readonly HashSet<DriveFile> _moved = [];
+        private readonly HashSet<DriveFile> _joined = [];
+        private readonly HashSet<DriveFile> _locked = [];
+        private readonly HashSet<DriveFile> _noRoom = [];
+        private readonly HashSet<DriveFile> _failed = [];
 
         public int Moved => _moved.Count;
 
-        public int Defragmented { get; private set; }
+        public int Defragmented => _joined.Count;
 
-        public int Locked { get; private set; }
+        public int Locked => _locked.Count;
 
-        public int NoRoom { get; private set; }
+        public int NoRoom => _noRoom.Count;
 
-        public int Failed { get; private set; }
+        public int Failed => _failed.Count;
 
         public long Clusters { get; set; }
 
@@ -395,21 +443,24 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
             {
                 case MoveOutcome.Moved:
                     _moved.Add(file);
+                    _noRoom.Remove(file);
+                    _failed.Remove(file);
                     break;
                 case MoveOutcome.Locked:
-                    Locked++;
+                    _locked.Add(file);
                     break;
-                case MoveOutcome.NoRoom:
-                    NoRoom++;
+                case MoveOutcome.NoRoom when !_moved.Contains(file) || file.IsFragmented:
+                    _noRoom.Add(file);
                     break;
-                case MoveOutcome.Failed:
-                    Failed++;
+                case MoveOutcome.Failed when !_moved.Contains(file):
+                    _failed.Add(file);
                     break;
             }
 
             if (joined)
             {
-                Defragmented++;
+                _joined.Add(file);
+                _noRoom.Remove(file);
             }
         }
     }

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.ComponentModel;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -142,13 +143,13 @@ public sealed class RepairProcessRunner(IRepairEnvironment environment, ILogger<
         var assembler = new ConsoleLineAssembler();
         var reader = new ProgressReader();
         var lines = new List<ConsoleLine>();
-        byte[] buffer = new byte[ChunkBytes];
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(ChunkBytes);
         try
         {
             int read;
-            while ((read = await stream.ReadAsync(buffer, CancellationToken.None).ConfigureAwait(false)) > 0)
+            while ((read = await stream.ReadAsync(buffer.AsMemory(0, ChunkBytes), CancellationToken.None).ConfigureAwait(false)) > 0)
             {
-                assembler.Append(decoder.Decode(buffer.AsSpan(0, read)), lines);
+                decoder.DecodeInto(buffer.AsSpan(0, read), assembler, lines);
                 Publish();
             }
         }
@@ -156,8 +157,12 @@ public sealed class RepairProcessRunner(IRepairEnvironment environment, ILogger<
         {
             RepairLog.OutputClosed(logger, kind, ex);
         }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
 
-        assembler.Append(decoder.Finish(), lines);
+        decoder.FinishInto(assembler, lines);
         if (assembler.Complete() is { } last)
         {
             lines.Add(last);

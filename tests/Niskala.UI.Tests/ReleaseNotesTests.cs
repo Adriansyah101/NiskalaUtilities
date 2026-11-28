@@ -10,6 +10,7 @@ public sealed class ReleaseNotesTests
     {
         IReadOnlyList<NoteLine> notes = PatchNotes.Parse(PatchNotes.Bundled());
 
+        Assert.True(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.3.2")));
         Assert.True(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.3.1")));
         Assert.True(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.3.0")));
         Assert.True(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.2.0")));
@@ -17,7 +18,7 @@ public sealed class ReleaseNotesTests
         Assert.True(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.1.2")));
         Assert.True(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.1.1")));
         Assert.True(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.1.0")));
-        Assert.False(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.3.2")));
+        Assert.False(UpdatesViewModel.Covers(notes, ReleaseVersion.Parse("0.3.3")));
     }
 
     [Fact]

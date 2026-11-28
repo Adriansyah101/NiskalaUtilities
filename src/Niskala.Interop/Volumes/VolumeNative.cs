@@ -25,7 +25,16 @@ public readonly record struct DiskCounters(long BytesRead, long BytesWritten, in
 
 public readonly record struct FoundEntry(string Name, FileAttributes Attributes, long Size, DateTime LastWriteUtc);
 
-public readonly record struct NtfsLayout(long MftStartLcn, long MftClusters, long MftZoneStart, long MftZoneEnd, long FileRecords);
+public readonly record struct NtfsLayout(
+    long MftStartLcn,
+    long MftClusters,
+    long MftZoneStart,
+    long MftZoneEnd,
+    long FileRecords,
+    long BytesPerCluster = 0,
+    int BytesPerSector = 0,
+    int BytesPerFileRecord = 0,
+    long MftValidBytes = 0);
 
 public readonly record struct StorageDeviceFacts(int BusType, string Vendor, string Product);
 
@@ -526,8 +535,33 @@ public static partial class VolumeNative
 
         long clusters = data.BytesPerCluster == 0 ? 0 : (data.MftValidDataLength + data.BytesPerCluster - 1) / data.BytesPerCluster;
         long records = data.BytesPerFileRecordSegment == 0 ? 0 : data.MftValidDataLength / data.BytesPerFileRecordSegment;
-        layout = new NtfsLayout(data.MftStartLcn, clusters, data.MftZoneStart, data.MftZoneEnd, records);
+        layout = new NtfsLayout(
+            data.MftStartLcn,
+            clusters,
+            data.MftZoneStart,
+            data.MftZoneEnd,
+            records,
+            data.BytesPerCluster,
+            (int)Math.Min(int.MaxValue, data.BytesPerSector),
+            (int)Math.Min(int.MaxValue, data.BytesPerFileRecordSegment),
+            data.MftValidDataLength);
         return 0;
+    }
+
+    public static unsafe int TryReadVolume(SafeFileHandle volume, long offset, Span<byte> buffer, out int read)
+    {
+        read = 0;
+        var overlapped = new ReadOverlapped { Offset = (uint)offset, OffsetHigh = (uint)(offset >> 32) };
+        fixed (byte* data = buffer)
+        {
+            if (!ReadFile(volume, data, (uint)buffer.Length, out uint done, &overlapped))
+            {
+                return Marshal.GetLastPInvokeError();
+            }
+
+            read = (int)done;
+            return 0;
+        }
     }
 
     public static unsafe int TryReadCounters(SafeFileHandle volume, out DiskCounters counters)
@@ -678,6 +712,10 @@ public static partial class VolumeNative
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static unsafe partial bool GetFileInformationByHandleEx(SafeFileHandle file, int infoClass, void* info, uint size);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool ReadFile(SafeFileHandle file, byte* buffer, uint bytes, out uint read, ReadOverlapped* overlapped);
 
     [LibraryImport("kernel32.dll", SetLastError = true)]
     private static unsafe partial SafeFileHandle OpenFileById(SafeFileHandle hint, FileIdDescriptor* id, uint access, uint share, nint security, uint flags);
@@ -844,9 +882,22 @@ public static partial class VolumeNative
         public uint ClusterCount;
     }
 
+    [StructLayout(LayoutKind.Explicit, Size = 32)]
+    private struct ReadOverlapped
+    {
+        [FieldOffset(16)]
+        public uint Offset;
+
+        [FieldOffset(20)]
+        public uint OffsetHigh;
+    }
+
     [StructLayout(LayoutKind.Explicit, Size = 96)]
     private struct NtfsVolumeData
     {
+        [FieldOffset(40)]
+        public uint BytesPerSector;
+
         [FieldOffset(44)]
         public uint BytesPerCluster;
 

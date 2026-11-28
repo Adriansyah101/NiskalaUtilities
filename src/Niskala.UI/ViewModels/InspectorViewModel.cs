@@ -574,7 +574,7 @@ public sealed partial class InspectorViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void StopWaiting() => _wait?.Cancel();
+    private void StopWaiting() => TaskViewModel.Stop(_wait);
 
     [RelayCommand(CanExecute = nameof(CanRunRescan))]
     private async Task RescanAsync()
@@ -1378,7 +1378,7 @@ public sealed partial class InspectorViewModel : ObservableObject
     private void CancelFlow()
     {
         bool removing = Gate.Stage == FlowStage.Removing;
-        _wait?.Cancel();
+        TaskViewModel.Stop(_wait);
         ResetFlow();
         Error = string.Empty;
         IsOpen = false;

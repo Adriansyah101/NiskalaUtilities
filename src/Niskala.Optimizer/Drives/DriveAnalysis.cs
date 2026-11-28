@@ -14,7 +14,7 @@ public sealed class DriveFile
         Extents = extents;
     }
 
-    public string Folder { get; }
+    public string Folder { get; internal set; }
 
     public string Name { get; }
 
@@ -90,7 +90,8 @@ public sealed record DriveSummary(
     int ArchiveFiles,
     int Protected,
     int Locked,
-    int Inaccessible);
+    int Inaccessible,
+    int ResidentFiles = 0);
 
 public sealed class DriveAnalysis
 {
@@ -178,16 +179,18 @@ public sealed class DriveAnalysis
             archive,
             Counts.Protected,
             locked,
-            Counts.Inaccessible);
+            Counts.Inaccessible,
+            Counts.Resident);
     }
 }
 
-internal sealed record ScanCounts(int Protected, int Locked, int Inaccessible, int Links);
+internal sealed record ScanCounts(int Protected, int Locked, int Inaccessible, int Links, int Resident = 0, int Opened = 0);
 
 public static class ScanProgress
 {
     public const double Ceiling = 99;
     public const double TableShare = 25;
+    public const double RecordShare = 90;
 
     public static double Percent(long clustersScanned, long clustersUsed, long entriesSeen, long entriesExpected)
     {
@@ -201,11 +204,11 @@ public static class ScanProgress
         return Math.Min(Ceiling, (clusters + entries) * 50);
     }
 
-    public static double Table(long recordsRead, long recordsExpected) =>
-        recordsExpected <= 0 ? 0 : TableShare * Math.Clamp(recordsRead / (double)recordsExpected, 0, 1);
+    public static double Table(long recordsRead, long recordsExpected, double share = TableShare) =>
+        recordsExpected <= 0 ? 0 : share * Math.Clamp(recordsRead / (double)recordsExpected, 0, 1);
 
-    public static double AfterTable(double scanPercent) =>
-        Math.Min(Ceiling, TableShare + (Math.Clamp(scanPercent, 0, 100) * (100 - TableShare) / 100));
+    public static double AfterTable(double scanPercent, double share = TableShare) =>
+        Math.Min(Ceiling, share + (Math.Clamp(scanPercent, 0, 100) * (100 - share) / 100));
 }
 
 public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = null, Func<IoThrottleController>? throttle = null)
@@ -242,7 +245,9 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             session,
             _throttle(),
             progress);
-        ScanMethod method = ReadFileTable(session, scan, cancellationToken) is { } records
+        ScanMethod method = ReadFileRecords(session, scan, cancellationToken) is { } direct
+            ? direct.Scan(session, scan, cancellationToken)
+            : ReadFileTable(session, scan, cancellationToken) is { } records
             ? ScanFileTable(session, records, scan, cancellationToken)
             : WalkFolders(session, scan, cancellationToken);
         var analysis = new DriveAnalysis(volume, bitmap, map, scan.Files, scan.Counts(), method);
@@ -251,6 +256,38 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
     }
 
     internal static bool IsLock(int error) => error is VolumeNative.ErrorSharingViolation or VolumeNative.ErrorLockViolation or VolumeNative.ErrorAccessDenied;
+
+    private static RecordSet? ReadFileRecords(IVolumeSession session, Scan scan, CancellationToken cancellationToken)
+    {
+        if (!FileTableScan.Supports(scan.Volume))
+        {
+            return null;
+        }
+
+        scan.Report(DrivePhase.ReadingFileTable, 0, scan.Volume.Name);
+        var records = new RecordSet(scan);
+        var report = Stopwatch.StartNew();
+        int error = session.ReadFileRecords(
+            records.Add,
+            count =>
+            {
+                scan.Breathe(cancellationToken);
+                if (report.Elapsed >= ReportEvery)
+                {
+                    report.Restart();
+                    scan.Report(DrivePhase.ReadingFileTable, ScanProgress.Table(count, scan.Expected, ScanProgress.RecordShare), scan.Volume.Name);
+                }
+            },
+            cancellationToken,
+            out int damaged);
+        if (error == 0 && records.Count > 0)
+        {
+            scan.Inaccessible += damaged;
+            return records;
+        }
+
+        return null;
+    }
 
     private static List<MftRecord>? ReadFileTable(IVolumeSession session, Scan scan, CancellationToken cancellationToken)
     {
@@ -286,55 +323,69 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
     {
         FileTablePaths paths = FileTablePaths.From(scan.Volume.Root, records);
         FileTableScan.SortByRecord(records);
-        scan.StartTable(records.Count);
+        scan.StartTable(records.Count, ScanProgress.TableShare);
         var extents = new List<Extent>();
         long previous = -1;
         foreach (MftRecord record in records)
         {
             cancellationToken.ThrowIfCancellationRequested();
             scan.Seen(cancellationToken);
-            if (record.Id == previous)
+            if (Admit(record, paths, scan, ref previous) is { } folder)
             {
-                continue;
+                Open(session, scan, record, folder, extents);
             }
-
-            previous = record.Id;
-            if (record.Number < FileTableScan.FirstUserRecord)
-            {
-                if (record.Number != FileTableScan.RootRecord)
-                {
-                    scan.Protected++;
-                }
-
-                continue;
-            }
-
-            if (paths.Resolve(record.Parent) is not { } folder || folder.IsProtected || ProtectedFiles.IsProtectedName(record.Name))
-            {
-                scan.Protected++;
-                continue;
-            }
-
-            if (record.IsReparsePoint)
-            {
-                scan.Links++;
-                continue;
-            }
-
-            extents.Clear();
-            int error = session.ReadRecord(record.Id, extents, out RecordFacts facts);
-            if (record.IsDirectory)
-            {
-                scan.Folder(error, extents);
-                continue;
-            }
-
-            scan.Add(folder.Full, record.Name, error, facts.Size, facts.LastWriteUtc, extents);
         }
 
         records.Clear();
         records.TrimExcess();
         return ScanMethod.FileTable;
+    }
+
+    private static TableFolder? Admit(MftRecord record, FileTablePaths paths, Scan scan, ref long previous)
+    {
+        if (record.Id == previous)
+        {
+            return null;
+        }
+
+        previous = record.Id;
+        if (record.Number < FileTableScan.FirstUserRecord)
+        {
+            if (record.Number != FileTableScan.RootRecord)
+            {
+                scan.Protected++;
+            }
+
+            return null;
+        }
+
+        if (paths.Resolve(record.Parent) is not { } folder || folder.IsProtected || ProtectedFiles.IsProtectedName(record.Name))
+        {
+            scan.Protected++;
+            return null;
+        }
+
+        if (record.IsReparsePoint)
+        {
+            scan.Links++;
+            return null;
+        }
+
+        return folder;
+    }
+
+    private static void Open(IVolumeSession session, Scan scan, MftRecord record, TableFolder folder, List<Extent> extents)
+    {
+        extents.Clear();
+        scan.Opened++;
+        int error = session.ReadRecord(record.Id, extents, out RecordFacts facts);
+        if (record.IsDirectory)
+        {
+            scan.Folder(error, extents);
+            return;
+        }
+
+        scan.Add(folder.Full, record.Name, error, facts.Size, facts.LastWriteUtc, extents);
     }
 
     private static ScanMethod WalkFolders(IVolumeSession session, Scan scan, CancellationToken cancellationToken)
@@ -388,6 +439,141 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
         return ScanMethod.Folders;
     }
 
+    private sealed class RecordSet(Scan scan)
+    {
+        private readonly List<FileRecord> _folders = [];
+        private readonly List<FileRecord> _unknown = [];
+        private readonly List<(long Parent, DriveFile File)> _files = [];
+        private readonly List<(long Parent, ContentKind Kind)> _small = [];
+        private int _system;
+
+        private enum ContentKind : byte
+        {
+            Resident,
+            Link,
+            ProtectedName,
+        }
+
+        public int Count => _folders.Count + _unknown.Count + _files.Count + _small.Count + _system;
+
+        public void Add(FileRecord record)
+        {
+            MftRecord entry = record.Entry;
+            if (entry.IsDirectory)
+            {
+                _folders.Add(record);
+                return;
+            }
+
+            if (entry.Number < FileTableScan.FirstUserRecord)
+            {
+                _system++;
+                return;
+            }
+
+            if (ProtectedFiles.IsProtectedName(entry.Name))
+            {
+                _small.Add((entry.Parent, ContentKind.ProtectedName));
+            }
+            else if (entry.IsReparsePoint)
+            {
+                _small.Add((entry.Parent, ContentKind.Link));
+            }
+            else if (record.Extents is not { } extents)
+            {
+                _unknown.Add(record);
+            }
+            else if (extents.Length == 0)
+            {
+                _small.Add((entry.Parent, ContentKind.Resident));
+            }
+            else
+            {
+                _files.Add((entry.Parent, scan.Create(entry.Name, record.Size, record.LastWriteUtc, extents)));
+            }
+        }
+
+        public ScanMethod Scan(IVolumeSession session, Scan scan, CancellationToken cancellationToken)
+        {
+            var paths = new FileTablePaths(scan.Volume.Root);
+            foreach (FileRecord folder in _folders)
+            {
+                if (!folder.Entry.IsReparsePoint)
+                {
+                    paths.AddFolder(folder.Entry.Id, folder.Entry.Parent, folder.Entry.Name);
+                }
+            }
+
+            scan.StartTable(Count, ScanProgress.RecordShare);
+            scan.Protected += _system;
+            var extents = new List<Extent>();
+            long previous = -1;
+            foreach (FileRecord folder in _folders)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                scan.Seen(cancellationToken);
+                if (Admit(folder.Entry, paths, scan, ref previous) is { } at)
+                {
+                    if (folder.Extents is { } known)
+                    {
+                        scan.Folder(0, known);
+                    }
+                    else
+                    {
+                        Open(session, scan, folder.Entry, at, extents);
+                    }
+                }
+            }
+
+            foreach ((long parent, DriveFile file) in _files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                scan.Seen(cancellationToken);
+                if (paths.Resolve(parent) is not { IsProtected: false } at)
+                {
+                    scan.Protected++;
+                    continue;
+                }
+
+                file.Folder = at.Full;
+                scan.Adopt(file);
+            }
+
+            foreach ((long parent, ContentKind kind) in _small)
+            {
+                scan.Seen(cancellationToken);
+                if (kind == ContentKind.ProtectedName || paths.Resolve(parent) is not { IsProtected: false })
+                {
+                    scan.Protected++;
+                }
+                else if (kind == ContentKind.Link)
+                {
+                    scan.Links++;
+                }
+                else
+                {
+                    scan.Resident++;
+                }
+            }
+
+            foreach (FileRecord record in _unknown)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                scan.Seen(cancellationToken);
+                if (Admit(record.Entry, paths, scan, ref previous) is { } at)
+                {
+                    Open(session, scan, record.Entry, at, extents);
+                }
+            }
+
+            _folders.Clear();
+            _files.Clear();
+            _small.Clear();
+            _unknown.Clear();
+            return ScanMethod.FileRecords;
+        }
+    }
+
     private sealed class Scan(
         DriveVolume volume,
         DriveMap map,
@@ -403,6 +589,7 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
         private long _scanned;
         private long _entries = expected;
         private bool _table;
+        private double _share = ScanProgress.TableShare;
 
         public DriveVolume Volume => volume;
 
@@ -418,13 +605,18 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
 
         public int Links { get; set; }
 
-        public ScanCounts Counts() => new(Protected, Locked, Inaccessible, Links);
+        public int Resident { get; set; }
 
-        public void StartTable(long records)
+        public int Opened { get; set; }
+
+        public ScanCounts Counts() => new(Protected, Locked, Inaccessible, Links, Resident, Opened);
+
+        public void StartTable(long records, double share)
         {
             _table = true;
+            _share = share;
             _entries = records;
-            Report(DrivePhase.Scanning, ScanProgress.AfterTable(0), volume.Name);
+            Report(DrivePhase.Scanning, ScanProgress.AfterTable(0, share), volume.Name);
         }
 
         public void Report(DrivePhase phase, double percent, string current) =>
@@ -432,11 +624,14 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
 
         public void Seen(CancellationToken cancellationToken)
         {
-            if (++_seen % YieldEvery != 0)
+            if (++_seen % YieldEvery == 0)
             {
-                return;
+                Breathe(cancellationToken);
             }
+        }
 
+        public void Breathe(CancellationToken cancellationToken)
+        {
             TimeSpan pause = controller.Next(session.SampleIo(), 0);
             if (pause > IoThrottleController.Breather)
             {
@@ -445,7 +640,7 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             }
         }
 
-        public void Folder(int error, List<Extent> extents)
+        public void Folder(int error, IEnumerable<Extent> extents)
         {
             if (error == 0)
             {
@@ -471,10 +666,20 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
 
             if (extents.Count == 0)
             {
+                Resident++;
                 return;
             }
 
-            var file = new DriveFile(folder, name, size, [.. extents], ZoneClassifier.Classify(name, size, lastWriteUtc, now));
+            DriveFile file = Create(name, size, lastWriteUtc, [.. extents]);
+            file.Folder = folder;
+            Adopt(file);
+        }
+
+        public DriveFile Create(string name, long size, DateTime lastWriteUtc, Extent[] extents) =>
+            new(string.Empty, name, size, extents, ZoneClassifier.Classify(name, size, lastWriteUtc, now));
+
+        public void Adopt(DriveFile file)
+        {
             Files.Add(file);
             map.Own(file.Extents, file.State, add: true);
             _scanned += file.Clusters;
@@ -482,7 +687,7 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             {
                 _report.Restart();
                 double percent = ScanProgress.Percent(_scanned, used, _seen, _entries);
-                Report(DrivePhase.Scanning, _table ? ScanProgress.AfterTable(percent) : percent, file.Path);
+                Report(DrivePhase.Scanning, _table ? ScanProgress.AfterTable(percent, _share) : percent, file.Path);
             }
         }
     }

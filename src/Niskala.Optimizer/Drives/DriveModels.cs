@@ -98,6 +98,7 @@ public enum ScanMethod
 {
     Folders,
     FileTable,
+    FileRecords,
 }
 
 public readonly record struct DriveProgress(DrivePhase Phase, double Percent, string Current, long MapVersion, DriveMap? Map);

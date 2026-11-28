@@ -24,6 +24,8 @@ public interface IVolumeSession : IDisposable
 
     int ReadFileTable(List<MftRecord> records, Action<int>? progress, CancellationToken cancellationToken);
 
+    int ReadFileRecords(Action<FileRecord> record, Action<int>? progress, CancellationToken cancellationToken, out int damaged);
+
     int ReadRecord(long id, List<Extent> extents, out RecordFacts facts);
 
     int BeginMove(string path, out IFileMover? mover);
@@ -272,24 +274,30 @@ public sealed class SystemVolumes : IVolumeSystem
         public int ReadFileTable(List<MftRecord> records, Action<int>? progress, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(records);
-            if (!FileTableScan.Supports(volume))
+            int error = OpenHint();
+            return error != 0 ? error : VolumeNative.TryEnumerateMft(handle, records, progress, cancellationToken);
+        }
+
+        public int ReadFileRecords(Action<FileRecord> record, Action<int>? progress, CancellationToken cancellationToken, out int damaged)
+        {
+            ArgumentNullException.ThrowIfNull(record);
+            damaged = 0;
+            int error = OpenHint();
+            if (error != 0)
             {
-                return VolumeNative.ErrorNotSupported;
+                return error;
             }
 
-            if (_hint is null)
+            error = VolumeNative.TryGetNtfsLayout(handle, out NtfsLayout layout);
+            if (error != 0)
             {
-                int error = VolumeNative.TryOpenEntry(volume.Root, out SafeFileHandle hint);
-                if (error != 0)
-                {
-                    hint.Dispose();
-                    return error;
-                }
-
-                _hint = hint;
+                return error;
             }
 
-            return VolumeNative.TryEnumerateMft(handle, records, progress, cancellationToken);
+            var geometry = new MftGeometry(layout.BytesPerCluster, layout.BytesPerSector, layout.BytesPerFileRecord, layout.MftStartLcn, layout.MftValidBytes);
+            return NtfsMftRecordReader.Read(geometry, Read, record, progress, cancellationToken, out damaged);
+
+            int Read(long offset, Span<byte> buffer, out int read) => VolumeNative.TryReadVolume(handle, offset, buffer, out read);
         }
 
         public int ReadRecord(long id, List<Extent> extents, out RecordFacts facts)
@@ -384,6 +392,29 @@ public sealed class SystemVolumes : IVolumeSystem
         {
             _hint?.Dispose();
             handle.Dispose();
+        }
+
+        private int OpenHint()
+        {
+            if (!FileTableScan.Supports(volume))
+            {
+                return VolumeNative.ErrorNotSupported;
+            }
+
+            if (_hint is not null)
+            {
+                return 0;
+            }
+
+            int error = VolumeNative.TryOpenEntry(volume.Root, out SafeFileHandle hint);
+            if (error != 0)
+            {
+                hint.Dispose();
+                return error;
+            }
+
+            _hint = hint;
+            return 0;
         }
 
         private int Convert(SafeFileHandle entry, List<Extent> extents)

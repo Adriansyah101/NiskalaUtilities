@@ -49,6 +49,8 @@ public sealed class SizeQueueTests
     {
         int running = 0;
         int peak = 0;
+        int expected = DiskKindProbe.WorkersFor(DiskKind.Ssd) + DiskKindProbe.WorkersFor(DiskKind.Hdd);
+        using var full = new ManualResetEventSlim();
         using var done = new CountdownEvent(8);
         using var queue = new SizeQueue(
             path => path.StartsWith('S') ? new VolumeInfo("ssd", DiskKind.Ssd) : new VolumeInfo("hdd", DiskKind.Hdd),
@@ -56,7 +58,12 @@ public sealed class SizeQueueTests
             {
                 int now = Interlocked.Increment(ref running);
                 InterlockedMax(ref peak, now);
-                Thread.Sleep(200);
+                if (now >= expected)
+                {
+                    full.Set();
+                }
+
+                full.Wait(Timeout);
                 Interlocked.Decrement(ref running);
                 return Result(request, kind);
             });
@@ -71,7 +78,7 @@ public sealed class SizeQueueTests
         queue.Enqueue(new SizeRequest("h1", @"H:\1"));
 
         Assert.True(done.Wait(Timeout, TestContext.Current.CancellationToken));
-        Assert.Equal(DiskKindProbe.WorkersFor(DiskKind.Ssd) + DiskKindProbe.WorkersFor(DiskKind.Hdd), peak);
+        Assert.Equal(expected, peak);
     }
 
     private static FolderSize Result(SizeRequest request, DiskKind kind) =>

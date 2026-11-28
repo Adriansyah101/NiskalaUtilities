@@ -217,6 +217,11 @@ function New-Layout {
         throw "$($Payload.Name) has more than executables at its root: $($stray.Name -join ', ')."
     }
 
+    $notes = @(Get-ChildItem -LiteralPath $output -Recurse -Force | Where-Object { $_.Name -in 'docs', 'internal', 'ARCHITECTURE.md' })
+    if ($notes) {
+        throw "$($Payload.Name) holds repository notes that never ship: $($notes.Name -join ', ')."
+    }
+
     Get-ChildItem -LiteralPath $output -Filter '*.exe' | ForEach-Object { Test-Product $_.FullName $Payload.Description }
     $output
 }

@@ -189,10 +189,10 @@ public sealed partial class TrackerViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void FinishNow() => _finish?.Cancel();
+    private void FinishNow() => TaskViewModel.Stop(_finish);
 
     [RelayCommand]
-    private void Abandon() => _abandon?.Cancel();
+    private void Abandon() => TaskViewModel.Stop(_abandon);
 
     [RelayCommand]
     private async Task PlanRollbackAsync()

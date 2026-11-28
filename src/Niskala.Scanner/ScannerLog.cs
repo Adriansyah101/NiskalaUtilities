@@ -49,7 +49,7 @@ internal static partial class ScannerLog
     [LoggerMessage(EventId = 2042, Level = LogLevel.Information, Message = "Icon cache pruned: {Deleted} deleted, {Kept} kept")]
     public static partial void IconsPruned(ILogger logger, int deleted, int kept);
 
-    [LoggerMessage(EventId = 2043, Level = LogLevel.Warning, Message = "Could not delete cached icon {File}")]
+    [LoggerMessage(EventId = 2044, Level = LogLevel.Warning, Message = "Could not delete cached icon {File}")]
     public static partial void IconDeleteFailed(ILogger logger, string file, Exception exception);
 
     [LoggerMessage(EventId = 2043, Level = LogLevel.Debug, Message = "Icon for {AppId} was cached by another request first")]
