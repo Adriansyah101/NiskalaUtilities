@@ -82,8 +82,7 @@ public sealed class DriveMap
         {
             for (int cell = 0; cell < cells; cell++)
             {
-                int first = (int)((long)cell * Segments / cells);
-                int last = (int)Math.Max(first + 1, (long)(cell + 1) * Segments / cells);
+                (int first, int last) = CellSegments(cell, cells);
                 long total = 0, allocated = 0, owned = 0, fragmented = 0, archive = 0;
                 for (int segment = first; segment < last && segment < Segments; segment++)
                 {
@@ -100,6 +99,33 @@ public sealed class DriveMap
         }
 
         return states;
+    }
+
+    public (long Start, long End) CellRange(int cell, int cells)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cells);
+        ArgumentOutOfRangeException.ThrowIfNegative(cell);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(cell, cells);
+        (int first, int last) = CellSegments(cell, cells);
+        return (Bounds(first).Start, Bounds(Math.Min(last, Segments) - 1).End);
+    }
+
+    public int CellOf(long lcn, int cells)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cells);
+        int segment = SegmentOf(Math.Clamp(lcn, 0, Math.Max(0, Clusters - 1)));
+        int cell = (int)Math.Min(cells - 1, (long)segment * cells / Segments);
+        while (cell > 0 && CellSegments(cell, cells).First > segment)
+        {
+            cell--;
+        }
+
+        while (cell < cells - 1 && CellSegments(cell, cells).Last <= segment)
+        {
+            cell++;
+        }
+
+        return cell;
     }
 
     public (long Free, long Used, long Fragmented, long Archive, long System) Totals()
@@ -131,6 +157,28 @@ public sealed class DriveMap
 
     private (long Start, long End) Bounds(int segment) =>
         (segment * Clusters / Segments, (segment + 1L) * Clusters / Segments);
+
+    private (int First, int Last) CellSegments(int cell, int cells)
+    {
+        int first = (int)((long)cell * Segments / cells);
+        return (first, (int)Math.Max(first + 1, (long)(cell + 1) * Segments / cells));
+    }
+
+    private int SegmentOf(long lcn)
+    {
+        int segment = (int)Math.Min(Segments - 1, lcn * Segments / Math.Max(1, Clusters));
+        while (segment < Segments - 1 && Bounds(segment).End <= lcn)
+        {
+            segment++;
+        }
+
+        while (segment > 0 && Bounds(segment).Start > lcn)
+        {
+            segment--;
+        }
+
+        return segment;
+    }
 
     private void Apply(long[] counts, long start, long clusters, int sign)
     {

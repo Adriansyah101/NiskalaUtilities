@@ -28,17 +28,17 @@ AppId={{3EC397E4-E199-4B2F-B436-8F7D0FC248B9}
 AppName=Niskala Utilities
 AppVersion={#AppVersion}
 AppVerName=Niskala Utilities {#AppVersion}
-AppPublisher=Adriansyah101
+AppPublisher=Niskala Project
 AppPublisherURL=https://github.com/Adriansyah101/NiskalaUtilities
 AppSupportURL=https://github.com/Adriansyah101/NiskalaUtilities/issues
 AppUpdatesURL=https://github.com/Adriansyah101/NiskalaUtilities/releases
-AppCopyright=Copyright (c) 2026 Adriansyah101
+AppCopyright=Copyright (c) 2026 Niskala Project
 VersionInfoVersion={#AppVersion}.0
-VersionInfoCompany=Adriansyah101
+VersionInfoCompany=Niskala Project
 VersionInfoDescription=Niskala Utilities Setup
 VersionInfoProductName=Niskala Utilities
 VersionInfoProductVersion={#AppVersion}
-VersionInfoCopyright=Copyright (c) 2026 Adriansyah101
+VersionInfoCopyright=Copyright (c) 2026 Niskala Project
 DefaultDirName={autopf}\Niskala Utilities
 DefaultGroupName=Niskala Utilities
 DisableProgramGroupPage=yes
@@ -115,11 +115,18 @@ begin
 end;
 
 procedure RememberTrust(Store: string);
+var
+  Previous: string;
 begin
-  if CertUtil('-store ' + Store + ' ' + PublisherThumbprint) then
-    RegWriteStringValue(HKEY_LOCAL_MACHINE, PublisherKey, TrustedPrefix + Store, PublisherThumbprint)
-  else
+  if not CertUtil('-store ' + Store + ' ' + PublisherThumbprint) then
+  begin
     Log('certutil could not add the publisher certificate to LocalMachine\' + Store + '.');
+    Exit;
+  end;
+  if RegQueryStringValue(HKEY_LOCAL_MACHINE, PublisherKey, TrustedPrefix + Store, Previous) and (CompareText(Previous, PublisherThumbprint) <> 0) then
+    if not CertUtil('-delstore ' + Store + ' ' + Previous) then
+      Log('certutil could not remove the previous publisher certificate from LocalMachine\' + Store + '.');
+  RegWriteStringValue(HKEY_LOCAL_MACHINE, PublisherKey, TrustedPrefix + Store, PublisherThumbprint);
 end;
 #endif
 

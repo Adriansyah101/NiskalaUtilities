@@ -15,10 +15,10 @@ internal sealed class FakeDisk : IVolumeSystem
     private readonly Dictionary<string, long> _ids = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<long, string> _paths = [];
 
-    public FakeDisk(long clusters, MediaKind media = MediaKind.Hdd, string fileSystem = "NTFS", bool trim = true, long bytesPerCluster = 4096)
+    public FakeDisk(long clusters, MediaKind media = MediaKind.Hdd, string fileSystem = "NTFS", bool trim = true, long bytesPerCluster = 4096, char letter = 'X')
     {
         _used = new bool[clusters];
-        Volume = new DriveVolume('X', "Test", fileSystem, bytesPerCluster, clusters, clusters * bytesPerCluster, clusters * bytesPerCluster, media, trim, SerialNumber: InitialSerial);
+        Volume = new DriveVolume(letter, "Test", fileSystem, bytesPerCluster, clusters, clusters * bytesPerCluster, clusters * bytesPerCluster, media, trim, SerialNumber: InitialSerial);
     }
 
     public const uint InitialSerial = 0x5EED_0001;

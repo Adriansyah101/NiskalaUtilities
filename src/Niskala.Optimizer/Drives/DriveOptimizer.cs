@@ -69,7 +69,7 @@ public sealed class DriveTrimmer(IVolumeSystem system)
         progress?.Report(new DriveProgress(DrivePhase.Trimming, Math.Clamp(percent, 0, 100), volume.Name, 0, null));
 }
 
-public sealed class DriveOptimizer(IVolumeSystem system, VolumeAnalysisCache? cache = null)
+public sealed class DriveOptimizer(IVolumeSystem system, VolumeAnalysisCache? cache = null, IDriveHealthSource? health = null)
 {
     public const string WorkerName = "Niskala drive optimizer";
 
@@ -78,6 +78,14 @@ public sealed class DriveOptimizer(IVolumeSystem system, VolumeAnalysisCache? ca
     public IReadOnlyList<DriveVolume> Volumes() => system.FixedVolumes();
 
     public DriveAnalysis? Cached(DriveVolume volume) => Cache.Find(volume);
+
+    public Task<DriveHealth> ReadHealthAsync(DriveVolume volume, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(volume);
+        return health is null
+            ? Task.FromResult(DriveHealth.Unavailable(volume))
+            : Task.Run(() => health.Read(volume), cancellationToken);
+    }
 
     public Task<DriveAnalysis> AnalyzeAsync(DriveVolume volume, IProgress<DriveProgress>? progress, CancellationToken cancellationToken) =>
         OnWorker(

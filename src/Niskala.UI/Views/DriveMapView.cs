@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Niskala.Optimizer.Drives;
@@ -15,6 +16,29 @@ public readonly record struct MapGrid(int Columns, int Rows, int Cell, int Gap, 
     public int Cells => Columns * Rows;
 
     public int Pitch => Cell + Gap;
+
+    public int CellAt(double x, double y, double scale)
+    {
+        if (Cells == 0 || x < 0 || y < 0 || scale <= 0)
+        {
+            return -1;
+        }
+
+        int column = (int)(x * scale) / Pitch;
+        int row = (int)(y * scale) / Pitch;
+        return column < Columns && row < Rows ? (row * Columns) + column : -1;
+    }
+
+    public int Step(int from, int columns, int rows)
+    {
+        if (Cells == 0)
+        {
+            return -1;
+        }
+
+        int start = Math.Clamp(from, 0, Cells - 1);
+        return Math.Clamp(start + columns + (rows * Columns), 0, Cells - 1);
+    }
 
     public static MapGrid For(double width, double height, double scale)
     {
@@ -39,18 +63,27 @@ public sealed partial class DriveMapView : Grid
     public static readonly DependencyProperty FragmentedBrushProperty = Register(nameof(FragmentedBrush));
     public static readonly DependencyProperty ArchiveBrushProperty = Register(nameof(ArchiveBrush));
     public static readonly DependencyProperty SystemBrushProperty = Register(nameof(SystemBrush));
+    public static readonly DependencyProperty HighlightBrushProperty = Register(nameof(HighlightBrush));
 
     private const int BytesPerPixel = 4;
 
     private readonly Image _image = new() { Stretch = Stretch.Fill, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private Func<int, ClusterState[]>? _source;
+    private Func<int, int>? _highlightSource;
     private WriteableBitmap? _bitmap;
     private byte[] _pixels = [];
     private XamlRoot? _root;
+    private MapGrid _grid;
+    private int _highlight = -1;
 
     public DriveMapView()
     {
         Children.Add(_image);
+        Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        IsTabStop = true;
+        UseSystemFocusVisuals = true;
+        Tapped += OnTapped;
+        KeyDown += OnKeyDown;
         SizeChanged += (_, _) => Render();
         ActualThemeChanged += (_, _) => Render();
         Loaded += (_, _) =>
@@ -95,9 +128,18 @@ public sealed partial class DriveMapView : Grid
         set => SetValue(SystemBrushProperty, value);
     }
 
-    public void Show(Func<int, ClusterState[]>? source)
+    public Brush? HighlightBrush
+    {
+        get => (Brush?)GetValue(HighlightBrushProperty);
+        set => SetValue(HighlightBrushProperty, value);
+    }
+
+    public event Action<int, int>? CellPicked;
+
+    public void Show(Func<int, ClusterState[]>? source, Func<int, int>? highlight = null)
     {
         _source = source;
+        _highlightSource = highlight;
         if (source is null)
         {
             Release();
@@ -131,6 +173,46 @@ public sealed partial class DriveMapView : Grid
         _image.Source = null;
         _bitmap = null;
         _pixels = [];
+        _grid = default;
+        _highlight = -1;
+    }
+
+    private void OnTapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (XamlRoot is not { } root)
+        {
+            return;
+        }
+
+        Windows.Foundation.Point point = e.GetPosition(this);
+        int cell = _grid.CellAt(point.X, point.Y, root.RasterizationScale);
+        if (cell >= 0)
+        {
+            Focus(FocusState.Pointer);
+            CellPicked?.Invoke(cell, _grid.Cells);
+            e.Handled = true;
+        }
+    }
+
+    private void OnKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        int from = _highlight >= 0 ? _highlight : 0;
+        int target = e.Key switch
+        {
+            Windows.System.VirtualKey.Left => _grid.Step(from, -1, 0),
+            Windows.System.VirtualKey.Right => _grid.Step(from, 1, 0),
+            Windows.System.VirtualKey.Up => _grid.Step(from, 0, -1),
+            Windows.System.VirtualKey.Down => _grid.Step(from, 0, 1),
+            Windows.System.VirtualKey.Home => _grid.Step(0, 0, 0),
+            Windows.System.VirtualKey.End => _grid.Step(_grid.Cells - 1, 0, 0),
+            Windows.System.VirtualKey.Enter or Windows.System.VirtualKey.Space => _grid.Step(from, 0, 0),
+            _ => -1,
+        };
+        if (target >= 0)
+        {
+            CellPicked?.Invoke(target, _grid.Cells);
+            e.Handled = true;
+        }
     }
 
     private static DependencyProperty Register(string name) =>
@@ -141,6 +223,20 @@ public sealed partial class DriveMapView : Grid
         : 0;
 
     private void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => Render();
+
+    private static void Mark(Span<uint> pixels, MapGrid grid, int cell, uint color)
+    {
+        int left = cell % grid.Columns * grid.Pitch;
+        int top = cell / grid.Columns * grid.Pitch;
+        int x0 = Math.Max(0, left - grid.Gap);
+        int x1 = Math.Min(grid.PixelWidth, left + grid.Cell + grid.Gap);
+        int y0 = Math.Max(0, top - grid.Gap);
+        int y1 = Math.Min(grid.PixelHeight, top + grid.Cell + grid.Gap);
+        for (int y = y0; y < y1; y++)
+        {
+            pixels.Slice((y * grid.PixelWidth) + x0, x1 - x0).Fill(color);
+        }
+    }
 
     private void Render()
     {
@@ -176,6 +272,13 @@ public sealed partial class DriveMapView : Grid
             {
                 pixels.Slice((y * grid.PixelWidth) + left, grid.Cell).Fill(color);
             }
+        }
+
+        _grid = grid;
+        _highlight = _highlightSource?.Invoke(grid.Cells) ?? -1;
+        if (_highlight >= 0 && _highlight < states.Length && _highlight < grid.Cells)
+        {
+            Mark(pixels, grid, _highlight, Pixel(HighlightBrush));
         }
 
         _pixels.CopyTo(_bitmap.PixelBuffer);

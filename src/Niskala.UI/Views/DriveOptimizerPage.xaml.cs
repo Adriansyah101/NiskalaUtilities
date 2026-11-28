@@ -17,29 +17,33 @@ public sealed partial class DriveOptimizerPage : UserControl
             {
                 ViewModel.MapChanged += Redraw;
                 ViewModel.PropertyChanged += OnViewModelChanged;
+                Map.CellPicked += OnCellPicked;
             },
             () =>
             {
                 ViewModel.MapChanged -= Redraw;
                 ViewModel.PropertyChanged -= OnViewModelChanged;
+                Map.CellPicked -= OnCellPicked;
                 Map.Show(null);
             });
         Loaded += (_, _) =>
         {
             events.Attach();
             SyncTab();
-            Map.Show(ViewModel.Summarize);
+            Redraw();
         };
         Unloaded += (_, _) => events.Detach();
     }
 
     public DriveOptimizerViewModel ViewModel { get; }
 
-    private void Redraw() => Map.Show(ViewModel.Summarize);
+    private void Redraw() => Map.Show(ViewModel.Summarize, ViewModel.HighlightCell);
+
+    private void OnCellPicked(int cell, int cells) => _ = ViewModel.InspectAsync(cell, cells);
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(DriveOptimizerViewModel.Tab) or nameof(DriveOptimizerViewModel.Selected))
+        if (e.PropertyName is nameof(DriveOptimizerViewModel.Tab) or nameof(DriveOptimizerViewModel.Selected) or nameof(DriveOptimizerViewModel.IsAnalyzed))
         {
             SyncTab();
         }
@@ -47,7 +51,12 @@ public sealed partial class DriveOptimizerPage : UserControl
 
     private void SyncTab()
     {
-        SelectorBarItem wanted = ViewModel.Tab == DriveOptimizerViewModel.TabFragments && ViewModel.IsHdd ? FragmentsTab : SummaryTab;
+        SelectorBarItem wanted = ViewModel.Tab switch
+        {
+            DriveOptimizerViewModel.TabFragments when ViewModel.IsHdd => FragmentsTab,
+            DriveOptimizerViewModel.TabInspector when ViewModel.IsAnalyzed => InspectorTab,
+            _ => SummaryTab,
+        };
         if (Tabs.SelectedItem != wanted)
         {
             Tabs.SelectedItem = wanted;
@@ -55,7 +64,9 @@ public sealed partial class DriveOptimizerPage : UserControl
     }
 
     private void OnTabChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) =>
-        ViewModel.Tab = sender.SelectedItem == FragmentsTab ? DriveOptimizerViewModel.TabFragments : DriveOptimizerViewModel.TabSummary;
+        ViewModel.Tab = sender.SelectedItem == FragmentsTab ? DriveOptimizerViewModel.TabFragments
+            : sender.SelectedItem == InspectorTab ? DriveOptimizerViewModel.TabInspector
+            : DriveOptimizerViewModel.TabSummary;
 
     private void OnBannerClosed(InfoBar sender, InfoBarClosedEventArgs args) => ViewModel.Banner.Clear();
 
@@ -73,6 +84,22 @@ public sealed partial class DriveOptimizerPage : UserControl
         }
 
         Confirm.Ask(PrimaryButton, Strings.Current.DriveDefragConfirm, ViewModel.PrimaryText, () => ViewModel.OptimizeCommand.Execute(null));
+    }
+
+    private void OnOptimizeQueue(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.CanQueueNow)
+        {
+            return;
+        }
+
+        if (!ViewModel.QueueMovesClusters)
+        {
+            ViewModel.OptimizeQueueCommand.Execute(null);
+            return;
+        }
+
+        Confirm.Ask(QueueButton, Strings.Current.QueueConfirm, ViewModel.QueueOptimizeText, () => ViewModel.OptimizeQueueCommand.Execute(null));
     }
 
     private void OnDefragChecked(object sender, RoutedEventArgs e)

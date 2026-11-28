@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)]
     [string[]]$Path,
 
-    [string]$Subject = 'CN=Adriansyah101',
+    [string]$Subject = 'CN=Niskala Project',
 
     [string]$CertificatePath
 )

@@ -60,6 +60,9 @@
       <RuntimeLibrary Condition="'$(Configuration)' == 'Release'">MultiThreaded</RuntimeLibrary>
       <Optimization Condition="'$(Configuration)' == 'Release'">MaxSpeed</Optimization>
     </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>NISKALA_VERSION=$(Version);NISKALA_VERSION_NUMBERS=$(Version.Replace('.', ',')),0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -80,6 +83,14 @@
     <ClCompile Include="src\Session.cpp" />
     <ClCompile Include="src\Tracker.cpp" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ResourceCompile Include="src\EtwHelper.rc" />
+  </ItemGroup>
+
+  <Target Name="RequireVersion" BeforeTargets="ResourceCompile">
+    <Error Condition="'$(Version)' == ''" Text="Directory.Build.props sets the version; it was not imported." />
+  </Target>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

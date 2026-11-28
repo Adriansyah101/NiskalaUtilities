@@ -30,6 +30,10 @@ public sealed partial class FragmentRowCollection : ObservableCollection<Fragmen
 
 public sealed partial class SummaryRowCollection : ObservableCollection<SummaryRow>;
 
+public sealed partial class StrategyRowCollection : ObservableCollection<StrategyRow>;
+
+public sealed partial class OccupantRowCollection : ObservableCollection<OccupantRow>;
+
 public sealed partial class RepairRowCollection : ObservableCollection<RepairRow>;
 
 public sealed partial class LogLineCollection : ObservableCollection<LogLine>;

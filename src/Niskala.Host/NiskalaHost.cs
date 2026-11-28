@@ -244,7 +244,7 @@ public sealed class NiskalaHost : IDisposable
         new RestraintStore(RestraintStore.DefaultFile),
         Logger<ProcessRestrainer>());
 
-    public static DriveOptimizer CreateDriveOptimizer() => new(SystemVolumes.Instance);
+    public static DriveOptimizer CreateDriveOptimizer() => new(SystemVolumes.Instance, health: SystemDriveHealth.Instance);
 
     public SizeQueue CreateSizeQueue() => SizeQueue.Create(new DiskKindProbe(), FolderSizeCache.Load(FolderSizeCache.DefaultFile, Logger<FolderSizeCache>()));
 

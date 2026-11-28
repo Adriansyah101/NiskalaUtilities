@@ -17,7 +17,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EtwHelperSource Include="$(EtwHelperDirectory)**\*.cpp;$(EtwHelperDirectory)**\*.h;$(EtwHelperDirectory)Niskala.EtwHelper.vcxproj" Exclude="$(EtwHelperDirectory)bin\**;$(EtwHelperDirectory)obj\**" />
+    <EtwHelperSource Include="$(EtwHelperDirectory)**\*.cpp;$(EtwHelperDirectory)**\*.h;$(EtwHelperDirectory)**\*.rc;$(EtwHelperDirectory)Niskala.EtwHelper.vcxproj;$(MSBuildThisFileDirectory)..\..\Directory.Build.props" Exclude="$(EtwHelperDirectory)bin\**;$(EtwHelperDirectory)obj\**" />
     <None Include="$(EtwHelperDll)" Link="Niskala.EtwHelper.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
 

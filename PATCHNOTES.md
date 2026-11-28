@@ -2,6 +2,19 @@
 
 What changed in each release of Niskala Utilities, newest first.
 
+## v0.3.3 (2026-11-28)
+
+### Added
+
+- **Strategy Guide** suggests Maximum Speed, Low Impact or Reclaim Contiguous Space for each hard disk, and TRIM only for SSDs.
+- **Cluster inspector.** Click a block on the drive map to list the files in it: contiguous, fragmented, archived or locked.
+- **Hardware telemetry.** The health tab shows S.M.A.R.T. status, temperature, power-on hours and SSD wear where the drive reports them.
+- **Drive queue.** Check several drives to analyze or optimize them one after another; SSDs in the queue still get TRIM only.
+
+### Improved
+
+- Releases are now signed as **Niskala Project**; updating replaces the old certificate that the installer trusted.
+
 ## v0.3.2 (2026-11-28)
 
 ### Improved
