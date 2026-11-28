@@ -11,6 +11,8 @@ public sealed partial class Strings
         "Hard disks are defragmented with the file system's own move calls, in small steps at background priority; solid-state drives get TRIM instead and are never defragmented.",
         "Hard disk didefrag dengan panggilan pemindahan milik sistem berkas, sedikit demi sedikit dengan prioritas latar belakang; SSD mendapat TRIM dan tidak pernah didefrag.");
     public string DriveAnalyze => T("Analyze", "Analisis");
+    public string DriveReanalyze => T("Re-analyze", "Analisis ulang");
+    public string DriveStopping => T("Stopping after current file…", "Menghentikan setelah berkas aktif selesai…");
     public string DriveDefragment => T("Defragment", "Defragmentasi");
     public string DriveTrim => T("Optimize (TRIM)", "Optimalkan (TRIM)");
     public string DriveAnalyzeOnly => T("Analyze only", "Hanya analisis");
@@ -111,6 +113,8 @@ public sealed partial class Strings
     {
         DrivePhase.Opening => T($"Opening {current}…", $"Membuka {current}…"),
         DrivePhase.ReadingMap => T("Reading the cluster map…", "Membaca peta klaster…"),
+        DrivePhase.ReadingFileTable => T("Reading the file table…", "Membaca tabel berkas…"),
+        DrivePhase.Stopping => T($"Finishing {current}", $"Menyelesaikan {current}"),
         DrivePhase.Scanning => T($"Scanning {current}", $"Memindai {current}"),
         DrivePhase.Moving => T($"Moving {current}", $"Memindahkan {current}"),
         DrivePhase.Compacting => T($"Compacting {current}", $"Memadatkan {current}"),

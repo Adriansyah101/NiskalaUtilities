@@ -103,9 +103,9 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     private readonly UiServices _services;
     private readonly DispatcherQueueTimer _clock;
     private readonly DispatcherQueueTimer _mapClock;
-    private readonly Dictionary<char, DriveAnalysis> _analyses = [];
     private readonly Lazy<DriveOptimizer> _optimizer = new(NiskalaHost.CreateDriveOptimizer);
     private CancellationTokenSource? _cancel;
+    private bool _moving;
     private DriveMap? _liveMap;
     private long _shownVersion = -1;
     private DateTimeOffset _started;
@@ -179,6 +179,15 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     [NotifyPropertyChangedFor(nameof(ShowMapEmpty))]
     public partial bool HasMap { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AnalyzeText))]
+    public partial bool IsAnalyzed { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsStopping { get; set; }
+
+    public string AnalyzeText => AnalyzeLabel(S, IsAnalyzed);
+
     public bool IsIdle => !IsRunning;
 
     public bool CanPrimary => CanOptimize();
@@ -219,6 +228,12 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         return strings.ActionName(volume?.DefaultAction == DriveAction.Trim ? DriveAction.Trim : DriveAction.Defragment);
     }
 
+    public static string AnalyzeLabel(Strings strings, bool analyzed)
+    {
+        ArgumentNullException.ThrowIfNull(strings);
+        return analyzed ? strings.DriveReanalyze : strings.DriveAnalyze;
+    }
+
     public static string FormatPercent(double percent) =>
         string.Create(CultureInfo.InvariantCulture, $"{(int)Math.Floor(Math.Clamp(double.IsNaN(percent) ? 0 : percent, 0, 100))}%");
 
@@ -250,9 +265,11 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         _cancel?.Cancel();
     }
 
-    private DriveMap? CurrentMap => IsRunning && _liveMap is not null ? _liveMap : Selected is { } row && _analyses.TryGetValue(row.Volume.Letter, out DriveAnalysis? analysis) ? analysis.Map : null;
+    private DriveMap? CurrentMap => IsRunning && _liveMap is not null ? _liveMap : CurrentAnalysis?.Map;
 
-    private DriveAnalysis? CurrentAnalysis => Selected is { } row && _analyses.TryGetValue(row.Volume.Letter, out DriveAnalysis? analysis) ? analysis : null;
+    private DriveAnalysis? CurrentAnalysis => Selected is { } row ? Cached(row.Volume) : null;
+
+    private DriveAnalysis? Cached(DriveVolume volume) => _optimizer.Value.Cached(volume);
 
     public static int TabFor(bool wasHdd, bool isHdd, int current) => !isHdd ? TabSummary : wasHdd ? current : TabFragments;
 
@@ -291,7 +308,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         foreach (DriveVolume volume in volumes)
         {
             var row = new DriveRow(volume);
-            if (_analyses.TryGetValue(volume.Letter, out DriveAnalysis? analysis))
+            if (Cached(volume) is { } analysis)
             {
                 row.FragmentedPercent = analysis.Summary().FragmentedPercent;
                 row.Relabel();
@@ -332,7 +349,23 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     }
 
     [RelayCommand(CanExecute = nameof(IsRunning))]
-    private void Cancel() => _cancel?.Cancel();
+    private void Cancel()
+    {
+        _cancel?.Cancel();
+        if (_moving)
+        {
+            ShowStopping();
+        }
+    }
+
+    private void ShowStopping()
+    {
+        if (!IsStopping)
+        {
+            IsStopping = true;
+            Banner.Show(InfoBarSeverity.Informational, S.DriveStopping);
+        }
+    }
 
     [RelayCommand]
     private void CheckAll() => SetChecked(true);
@@ -342,9 +375,10 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
 
     private Task DefragmentAsync(DriveRow row, DefragMode mode, IReadOnlyCollection<string>? only) => RunAsync(row, async token =>
     {
-        DriveAnalysis analysis = _analyses.TryGetValue(row.Volume.Letter, out DriveAnalysis? known) ? known : await AnalyzeCoreAsync(row, token);
+        DriveAnalysis analysis = Cached(row.Volume) ?? await AnalyzeCoreAsync(row, token);
         _liveMap = analysis.Map;
         Percent = 0;
+        _moving = true;
         DefragResult result = await _optimizer.Value.DefragmentAsync(analysis, mode, only, new Sink(this), token);
         row.FragmentedPercent = analysis.Summary().FragmentedPercent;
         UpdateVolume(row);
@@ -373,7 +407,6 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         HasMap = false;
         MapChanged?.Invoke();
         DriveAnalysis analysis = await _optimizer.Value.AnalyzeAsync(row.Volume, new Sink(this), token);
-        _analyses[row.Volume.Letter] = analysis;
         row.FragmentedPercent = analysis.Summary().FragmentedPercent;
         row.Relabel();
         ShowAnalysis();
@@ -427,6 +460,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
             Elapsed = Clock(DateTimeOffset.Now - _started);
             _cancel = null;
             _liveMap = null;
+            _moving = false;
+            IsStopping = false;
             Activity = string.Empty;
             IsRunning = false;
             RefreshMap(force: true);
@@ -448,6 +483,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         Summary.Clear();
         HasChecked = false;
         DriveAnalysis? analysis = CurrentAnalysis;
+        IsAnalyzed = analysis is not null;
         HasMap = CurrentMap is not null;
         if (analysis is null)
         {
@@ -522,6 +558,11 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     {
         Percent = progress.Percent;
         Activity = S.DrivePhaseText(progress.Phase, progress.Current);
+        if (progress.Phase == DrivePhase.Stopping && IsRunning)
+        {
+            ShowStopping();
+        }
+
         if (progress.Map is { } map && IsRunning)
         {
             _liveMap = map;

@@ -2,6 +2,23 @@
 
 Changes in each release of Niskala Utilities, newest first.
 
+## v0.3.1 (2026-11-28)
+
+### Changed
+
+- **Much faster analysis on NTFS.** Drive Optimizer now reads the drive's file table from start to end and opens the files in the order they are stored in it, instead of walking every folder, so the disk head no longer jumps across the drive. On a 5 TB USB hard disk with 1.7 million files, an analysis that took between 18 and 89 minutes now took 13 minutes. FAT32 and exFAT drives, and any drive whose file table cannot be read, are still analyzed folder by folder.
+- **Results are kept while the app runs.** The last analysis of each drive stays available when you switch drives, and every defragment run updates it, so a second run or **Defrag checked** starts at once. Once a drive has a result, **Analyze** becomes **Re-analyze** and scans the whole drive again. A different disk on the same letter is never given the old result, and each file is checked again just before it is moved.
+- The page file, the hibernation and swap files, the file system's own files, `$Extend` and `System Volume Information` are left alone in every folder, not only at the root of the drive.
+
+### Fixed
+
+- **Cancel no longer splits a file.** Cancel stops the queue at once, but a file that is already being moved, up to 2 GB, is finished first, so it never ends up in more pieces than before. The page says **Stopping after current file…** until it is done and then **Stopped**.
+- A run cancelled while its last file was being moved is reported as stopped.
+- A file that was already in one piece by the time it was reached is no longer counted as joined.
+- **Consolidate Free Space** puts each joined file into the lowest free space that holds it and compacts it afterwards like any other small file, so it no longer pushes data towards the end of the drive and the free space at the end grows.
+- **Full Zone Optimization** first moves documents out of the fast zone and only then places programs and libraries there, so programs no longer end up outside the fast zone for lack of room.
+- A file that is joined and then compacted in the same run is counted as one moved file.
+
 ## v0.3.0 (2026-11-27)
 
 ### Added

@@ -2,7 +2,7 @@ namespace Niskala.Optimizer.Drives;
 
 public readonly record struct IoSample(long BytesRead, long BytesWritten, int QueueDepth, TimeSpan At);
 
-public sealed class IoThrottleController
+public sealed class IoThrottleController(bool queueOnly = false)
 {
     public const long BusyBytesPerSecond = 8L << 20;
     public const int BusyQueueDepth = 2;
@@ -16,6 +16,8 @@ public sealed class IoThrottleController
     public TimeSpan Pause { get; private set; } = Breather;
 
     public bool IsUserBusy { get; private set; }
+
+    public bool QueueOnly => queueOnly;
 
     public TimeSpan Next(IoSample? sample, long ownBytes)
     {
@@ -35,7 +37,7 @@ public sealed class IoThrottleController
         double seconds = (now.At - before.At).TotalSeconds;
         long moved = (now.BytesRead - before.BytesRead) + (now.BytesWritten - before.BytesWritten);
         double foreign = Math.Max(0, moved - (2.0 * ownBytes)) / seconds;
-        IsUserBusy = foreign >= BusyBytesPerSecond || now.QueueDepth >= BusyQueueDepth;
+        IsUserBusy = (!queueOnly && foreign >= BusyBytesPerSecond) || now.QueueDepth >= BusyQueueDepth;
         Pause = IsUserBusy
             ? TimeSpan.FromTicks(Math.Min(LongestPause.Ticks, Math.Max(FirstBackoff.Ticks, Pause.Ticks * 2)))
             : TimeSpan.FromTicks(Math.Max(Breather.Ticks, Pause.Ticks / 2));

@@ -94,9 +94,10 @@ public sealed record DriveSummary(
 
 public sealed class DriveAnalysis
 {
-    internal DriveAnalysis(DriveVolume volume, ClusterBitmap bitmap, DriveMap map, List<DriveFile> files, ScanCounts counts)
+    internal DriveAnalysis(DriveVolume volume, ClusterBitmap bitmap, DriveMap map, List<DriveFile> files, ScanCounts counts, ScanMethod method)
     {
         Volume = volume;
+        Method = method;
         Bitmap = bitmap;
         Free = FreeSpaceIndex.From(bitmap);
         Map = map;
@@ -110,6 +111,8 @@ public sealed class DriveAnalysis
     }
 
     public DriveVolume Volume { get; }
+
+    public ScanMethod Method { get; }
 
     public ClusterBitmap Bitmap { get; }
 
@@ -184,6 +187,7 @@ internal sealed record ScanCounts(int Protected, int Locked, int Inaccessible, i
 public static class ScanProgress
 {
     public const double Ceiling = 99;
+    public const double TableShare = 25;
 
     public static double Percent(long clustersScanned, long clustersUsed, long entriesSeen, long entriesExpected)
     {
@@ -196,6 +200,12 @@ public static class ScanProgress
         double entries = Math.Clamp(entriesSeen / (double)entriesExpected, 0, 1);
         return Math.Min(Ceiling, (clusters + entries) * 50);
     }
+
+    public static double Table(long recordsRead, long recordsExpected) =>
+        recordsExpected <= 0 ? 0 : TableShare * Math.Clamp(recordsRead / (double)recordsExpected, 0, 1);
+
+    public static double AfterTable(double scanPercent) =>
+        Math.Min(Ceiling, TableShare + (Math.Clamp(scanPercent, 0, 100) * (100 - TableShare) / 100));
 }
 
 public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = null, Func<IoThrottleController>? throttle = null)
@@ -205,7 +215,9 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
     private static readonly TimeSpan ReportEvery = TimeSpan.FromMilliseconds(150);
 
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
-    private readonly Func<IoThrottleController> _throttle = throttle ?? (() => new IoThrottleController());
+    private readonly Func<IoThrottleController> _throttle = throttle ?? NewThrottle;
+
+    public static IoThrottleController NewThrottle() => new(queueOnly: true);
 
     public DriveAnalysis Analyze(DriveVolume volume, IProgress<DriveProgress>? progress, CancellationToken cancellationToken)
     {
@@ -221,112 +233,259 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
         progress?.Report(new DriveProgress(DrivePhase.ReadingMap, 0, volume.Name, 0, null));
         ClusterBitmap bitmap = session.ReadBitmap();
         DriveMap map = DriveMap.From(bitmap);
-        progress?.Report(new DriveProgress(DrivePhase.Scanning, 0, volume.Name, map.Version, map));
-        long used = Math.Max(1, bitmap.CountAllocated(0, bitmap.Clusters));
-        long expected = session.FileRecords();
-        long seen = 0;
-        IoThrottleController controller = _throttle();
-        DateTime now = _clock.GetUtcNow().UtcDateTime;
-        var files = new List<DriveFile>();
+        var scan = new Scan(
+            volume,
+            map,
+            Math.Max(1, bitmap.CountAllocated(0, bitmap.Clusters)),
+            session.FileRecords(),
+            _clock.GetUtcNow().UtcDateTime,
+            session,
+            _throttle(),
+            progress);
+        ScanMethod method = ReadFileTable(session, scan, cancellationToken) is { } records
+            ? ScanFileTable(session, records, scan, cancellationToken)
+            : WalkFolders(session, scan, cancellationToken);
+        var analysis = new DriveAnalysis(volume, bitmap, map, scan.Files, scan.Counts(), method);
+        progress?.Report(new DriveProgress(DrivePhase.Finished, 100, volume.Name, map.Version, map));
+        return analysis;
+    }
+
+    internal static bool IsLock(int error) => error is VolumeNative.ErrorSharingViolation or VolumeNative.ErrorLockViolation or VolumeNative.ErrorAccessDenied;
+
+    private static List<MftRecord>? ReadFileTable(IVolumeSession session, Scan scan, CancellationToken cancellationToken)
+    {
+        if (!FileTableScan.Supports(scan.Volume))
+        {
+            return null;
+        }
+
+        scan.Report(DrivePhase.ReadingFileTable, 0, scan.Volume.Name);
+        var records = new List<MftRecord>();
+        var report = Stopwatch.StartNew();
+        int error = session.ReadFileTable(
+            records,
+            count =>
+            {
+                if (report.Elapsed >= ReportEvery)
+                {
+                    report.Restart();
+                    scan.Report(DrivePhase.ReadingFileTable, ScanProgress.Table(count, scan.Expected), scan.Volume.Name);
+                }
+            },
+            cancellationToken);
+        if (error == 0 && records.Count > 0)
+        {
+            return records;
+        }
+
+        records.Clear();
+        return null;
+    }
+
+    private static ScanMethod ScanFileTable(IVolumeSession session, List<MftRecord> records, Scan scan, CancellationToken cancellationToken)
+    {
+        FileTablePaths paths = FileTablePaths.From(scan.Volume.Root, records);
+        FileTableScan.SortByRecord(records);
+        scan.StartTable(records.Count);
+        var extents = new List<Extent>();
+        long previous = -1;
+        foreach (MftRecord record in records)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            scan.Seen(cancellationToken);
+            if (record.Id == previous)
+            {
+                continue;
+            }
+
+            previous = record.Id;
+            if (record.Number < FileTableScan.FirstUserRecord)
+            {
+                if (record.Number != FileTableScan.RootRecord)
+                {
+                    scan.Protected++;
+                }
+
+                continue;
+            }
+
+            if (paths.Resolve(record.Parent) is not { } folder || folder.IsProtected || ProtectedFiles.IsProtectedName(record.Name))
+            {
+                scan.Protected++;
+                continue;
+            }
+
+            if (record.IsReparsePoint)
+            {
+                scan.Links++;
+                continue;
+            }
+
+            extents.Clear();
+            int error = session.ReadRecord(record.Id, extents, out RecordFacts facts);
+            if (record.IsDirectory)
+            {
+                scan.Folder(error, extents);
+                continue;
+            }
+
+            scan.Add(folder.Full, record.Name, error, facts.Size, facts.LastWriteUtc, extents);
+        }
+
+        records.Clear();
+        records.TrimExcess();
+        return ScanMethod.FileTable;
+    }
+
+    private static ScanMethod WalkFolders(IVolumeSession session, Scan scan, CancellationToken cancellationToken)
+    {
+        scan.Report(DrivePhase.Scanning, 0, scan.Volume.Name);
         var entries = new List<VolumeEntry>();
         var extents = new List<Extent>();
         var pending = new Stack<(string Full, string Relative)>();
-        pending.Push((volume.Root, string.Empty));
-        int protectedCount = 0, locked = 0, inaccessible = 0, links = 0;
-        long scanned = 0;
-        var report = Stopwatch.StartNew();
+        pending.Push((scan.Volume.Root, string.Empty));
         while (pending.TryPop(out (string Full, string Relative) folder))
         {
             cancellationToken.ThrowIfCancellationRequested();
             entries.Clear();
             if (session.List(folder.Full, entries) != 0)
             {
-                inaccessible++;
+                scan.Inaccessible++;
                 continue;
             }
 
             foreach (VolumeEntry entry in entries)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (++seen % YieldEvery == 0)
-                {
-                    Yield(session, controller, cancellationToken);
-                }
-
+                scan.Seen(cancellationToken);
                 string relative = folder.Relative.Length == 0 ? entry.Name : $"{folder.Relative}\\{entry.Name}";
                 string full = Path.Join(folder.Full, entry.Name);
                 if (ProtectedFiles.IsProtected(relative))
                 {
-                    protectedCount++;
+                    scan.Protected++;
                     continue;
                 }
 
                 if (entry.IsReparsePoint)
                 {
-                    links++;
+                    scan.Links++;
                     continue;
                 }
 
                 extents.Clear();
-                error = session.ReadExtents(full, extents);
+                int error = session.ReadExtents(full, extents);
                 if (entry.IsDirectory)
                 {
-                    if (error == 0)
-                    {
-                        map.Own(extents, ClusterState.Used, add: true);
-                    }
-
+                    scan.Folder(error, extents);
                     pending.Push((full, relative));
                     continue;
                 }
 
-                if (error != 0)
-                {
-                    if (error is VolumeNative.ErrorSharingViolation or VolumeNative.ErrorLockViolation)
-                    {
-                        locked++;
-                    }
-                    else
-                    {
-                        inaccessible++;
-                    }
-
-                    continue;
-                }
-
-                if (extents.Count == 0)
-                {
-                    continue;
-                }
-
-                var file = new DriveFile(folder.Full, entry.Name, entry.Size, [.. extents], ZoneClassifier.Classify(entry.Name, entry.Size, entry.LastWriteUtc, now));
-                files.Add(file);
-                map.Own(file.Extents, file.State, add: true);
-                scanned += file.Clusters;
-                if (report.Elapsed >= ReportEvery)
-                {
-                    report.Restart();
-                    progress?.Report(new DriveProgress(DrivePhase.Scanning, ScanProgress.Percent(scanned, used, seen, expected), full, map.Version, map));
-                }
+                scan.Add(folder.Full, entry.Name, error, entry.Size, entry.LastWriteUtc, extents);
             }
         }
 
-        var analysis = new DriveAnalysis(volume, bitmap, map, files, new ScanCounts(protectedCount, locked, inaccessible, links));
-        progress?.Report(new DriveProgress(DrivePhase.Finished, 100, volume.Name, map.Version, map));
-        return analysis;
+        return ScanMethod.Folders;
     }
 
-    private static void Yield(IVolumeSession session, IoThrottleController controller, CancellationToken cancellationToken)
+    private sealed class Scan(
+        DriveVolume volume,
+        DriveMap map,
+        long used,
+        long expected,
+        DateTime now,
+        IVolumeSession session,
+        IoThrottleController controller,
+        IProgress<DriveProgress>? progress)
     {
-        TimeSpan pause = controller.Next(session.SampleIo(), 0);
-        if (pause > IoThrottleController.Breather)
+        private readonly Stopwatch _report = Stopwatch.StartNew();
+        private long _seen;
+        private long _scanned;
+        private long _entries = expected;
+        private bool _table;
+
+        public DriveVolume Volume => volume;
+
+        public long Expected { get; } = expected;
+
+        public List<DriveFile> Files { get; } = [];
+
+        public int Protected { get; set; }
+
+        public int Locked { get; set; }
+
+        public int Inaccessible { get; set; }
+
+        public int Links { get; set; }
+
+        public ScanCounts Counts() => new(Protected, Locked, Inaccessible, Links);
+
+        public void StartTable(long records)
         {
-            cancellationToken.WaitHandle.WaitOne(pause);
-            cancellationToken.ThrowIfCancellationRequested();
+            _table = true;
+            _entries = records;
+            Report(DrivePhase.Scanning, ScanProgress.AfterTable(0), volume.Name);
+        }
+
+        public void Report(DrivePhase phase, double percent, string current) =>
+            progress?.Report(new DriveProgress(phase, percent, current, map.Version, map));
+
+        public void Seen(CancellationToken cancellationToken)
+        {
+            if (++_seen % YieldEvery != 0)
+            {
+                return;
+            }
+
+            TimeSpan pause = controller.Next(session.SampleIo(), 0);
+            if (pause > IoThrottleController.Breather)
+            {
+                cancellationToken.WaitHandle.WaitOne(pause);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+
+        public void Folder(int error, List<Extent> extents)
+        {
+            if (error == 0)
+            {
+                map.Own(extents, ClusterState.Used, add: true);
+            }
+        }
+
+        public void Add(string folder, string name, int error, long size, DateTime lastWriteUtc, List<Extent> extents)
+        {
+            if (error != 0)
+            {
+                if (error is VolumeNative.ErrorSharingViolation or VolumeNative.ErrorLockViolation)
+                {
+                    Locked++;
+                }
+                else
+                {
+                    Inaccessible++;
+                }
+
+                return;
+            }
+
+            if (extents.Count == 0)
+            {
+                return;
+            }
+
+            var file = new DriveFile(folder, name, size, [.. extents], ZoneClassifier.Classify(name, size, lastWriteUtc, now));
+            Files.Add(file);
+            map.Own(file.Extents, file.State, add: true);
+            _scanned += file.Clusters;
+            if (_report.Elapsed >= ReportEvery)
+            {
+                _report.Restart();
+                double percent = ScanProgress.Percent(_scanned, used, _seen, _entries);
+                Report(DrivePhase.Scanning, _table ? ScanProgress.AfterTable(percent) : percent, file.Path);
+            }
         }
     }
-
-    internal static bool IsLock(int error) => error is VolumeNative.ErrorSharingViolation or VolumeNative.ErrorLockViolation or VolumeNative.ErrorAccessDenied;
 }
 
 public sealed class DriveAccessException(DriveVolume volume, int error)

@@ -48,7 +48,8 @@ public sealed record DriveVolume(
     MediaKind Media,
     bool TrimSupported,
     StorageBus Bus = StorageBus.Unknown,
-    int RotationRate = MediaClassifier.RotationNotReported)
+    int RotationRate = MediaClassifier.RotationNotReported,
+    uint SerialNumber = 0)
 {
     private static readonly string[] MovableFileSystems = ["NTFS", "FAT", "FAT32", "exFAT"];
 
@@ -89,6 +90,14 @@ public enum DrivePhase
     Compacting,
     Trimming,
     Finished,
+    ReadingFileTable,
+    Stopping,
+}
+
+public enum ScanMethod
+{
+    Folders,
+    FileTable,
 }
 
 public readonly record struct DriveProgress(DrivePhase Phase, double Percent, string Current, long MapVersion, DriveMap? Map);

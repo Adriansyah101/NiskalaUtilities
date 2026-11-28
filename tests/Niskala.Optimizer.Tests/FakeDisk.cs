@@ -6,15 +6,56 @@ namespace Niskala.Optimizer.Tests;
 internal sealed class FakeDisk : IVolumeSystem
 {
     private const long Unallocated = -1;
+    private const long FirstRecord = 64;
+    private const long Sequence = 1L << 48;
 
     private readonly bool[] _used;
     private readonly Dictionary<string, long[]> _files = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (bool Directory, bool Link, long Size, DateTime Written)> _entries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _ids = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<long, string> _paths = [];
 
     public FakeDisk(long clusters, MediaKind media = MediaKind.Hdd, string fileSystem = "NTFS", bool trim = true, long bytesPerCluster = 4096)
     {
         _used = new bool[clusters];
-        Volume = new DriveVolume('X', "Test", fileSystem, bytesPerCluster, clusters, clusters * bytesPerCluster, clusters * bytesPerCluster, media, trim);
+        Volume = new DriveVolume('X', "Test", fileSystem, bytesPerCluster, clusters, clusters * bytesPerCluster, clusters * bytesPerCluster, media, trim, SerialNumber: InitialSerial);
+    }
+
+    public const uint InitialSerial = 0x5EED_0001;
+
+    public static long RootId { get; } = FileTableScan.RootRecord | (FileTableScan.RootRecord << 48);
+
+    public bool FileTable { get; set; }
+
+    public int FileTableError { get; set; }
+
+    public bool RecordsOutOfOrder { get; set; }
+
+    public int FileTableReads { get; private set; }
+
+    public List<long> RecordReads { get; } = [];
+
+    public Action<int>? OnMove { get; set; }
+
+    public long IdOf(string relative) => _ids[Path.Join(Root, relative)];
+
+    public FakeDisk Reformat(uint serial)
+    {
+        Volume = Volume with { SerialNumber = serial };
+        return this;
+    }
+
+    public FakeDisk Relocate(string relative, params (long Lcn, long Clusters)[] runs)
+    {
+        string path = Path.Join(Root, relative);
+        foreach (long lcn in _files[path])
+        {
+            _used[lcn] = false;
+        }
+
+        _files.Remove(path);
+        _entries.Remove(path);
+        return File(relative, runs);
     }
 
     public DriveVolume Volume { get; private set; }
@@ -58,12 +99,14 @@ internal sealed class FakeDisk : IVolumeSystem
     public FakeDisk Folder(string relative)
     {
         _entries[Path.Join(Root, relative)] = (true, false, 0, Now);
+        Name(relative);
         return this;
     }
 
     public FakeDisk Link(string relative)
     {
         _entries[Path.Join(Root, relative)] = (true, true, 0, Now);
+        Name(relative);
         return this;
     }
 
@@ -87,6 +130,7 @@ internal sealed class FakeDisk : IVolumeSystem
 
         _files[path] = map;
         _entries[path] = (false, false, clusters * Volume.BytesPerCluster, written);
+        Name(relative);
         Volume = Volume with { FreeBytes = _used.Count(u => !u) * Volume.BytesPerCluster };
         return this;
     }
@@ -128,6 +172,36 @@ internal sealed class FakeDisk : IVolumeSystem
         return RetrimExit;
     }
 
+    private void Name(string relative)
+    {
+        string path = Path.Join(Root, relative);
+        if (!_ids.ContainsKey(path))
+        {
+            long id = (FirstRecord + _ids.Count) | Sequence;
+            _ids[path] = id;
+            _paths[id] = path;
+        }
+    }
+
+    private bool UnderLink(string path)
+    {
+        for (string? parent = Path.GetDirectoryName(path); parent is not null && parent.Length > Root.Length - 1; parent = Path.GetDirectoryName(parent))
+        {
+            if (_entries.TryGetValue(parent, out var entry) && entry.Link)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private long ParentId(string path)
+    {
+        string parent = Path.GetDirectoryName(path)!;
+        return string.Equals(parent, Root, StringComparison.OrdinalIgnoreCase) ? RootId : _ids[parent];
+    }
+
     private static List<Extent> Extents(long[] map)
     {
         var extents = new List<Extent>();
@@ -149,6 +223,7 @@ internal sealed class FakeDisk : IVolumeSystem
     private int Move(string path, long vcn, long lcn, uint clusters)
     {
         Moves.Add(new MoveStep(vcn, lcn, clusters));
+        OnMove?.Invoke(Moves.Count);
         if (clusters > MoveChunks.MaxClusters)
         {
             return VolumeNative.ErrorInvalidParameter;
@@ -216,6 +291,56 @@ internal sealed class FakeDisk : IVolumeSystem
         {
             disk.Reads++;
             disk.OnRead?.Invoke(disk.Reads);
+            if (disk._files.TryGetValue(path, out long[]? map))
+            {
+                extents.AddRange(Extents(map));
+            }
+
+            return 0;
+        }
+
+        public int ReadFileTable(List<MftRecord> records, Action<int>? progress, CancellationToken cancellationToken)
+        {
+            disk.FileTableReads++;
+            if (!disk.FileTable)
+            {
+                return VolumeNative.ErrorNotSupported;
+            }
+
+            if (disk.FileTableError != 0)
+            {
+                return disk.FileTableError;
+            }
+
+            IEnumerable<KeyValuePair<string, long>> ids = disk.RecordsOutOfOrder ? disk._ids.OrderByDescending(p => p.Value) : disk._ids.OrderBy(p => p.Value);
+            foreach ((string path, long id) in ids)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!disk._entries.TryGetValue(path, out var entry) || disk.UnderLink(path))
+                {
+                    continue;
+                }
+
+                FileAttributes attributes = (entry.Directory ? FileAttributes.Directory : FileAttributes.Archive) | (entry.Link ? FileAttributes.ReparsePoint : 0);
+                records.Add(new MftRecord(id, disk.ParentId(path), attributes, Path.GetFileName(path)));
+                progress?.Invoke(records.Count);
+            }
+
+            return 0;
+        }
+
+        public int ReadRecord(long id, List<Extent> extents, out RecordFacts facts)
+        {
+            facts = default;
+            disk.Reads++;
+            disk.RecordReads.Add(id & MftRecord.RecordMask);
+            disk.OnRead?.Invoke(disk.Reads);
+            if (!disk._paths.TryGetValue(id, out string? path) || !disk._entries.TryGetValue(path, out var entry))
+            {
+                return VolumeNative.ErrorFileNotFound;
+            }
+
+            facts = new RecordFacts(entry.Size, entry.Written);
             if (disk._files.TryGetValue(path, out long[]? map))
             {
                 extents.AddRange(Extents(map));

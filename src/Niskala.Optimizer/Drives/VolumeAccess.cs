@@ -22,6 +22,10 @@ public interface IVolumeSession : IDisposable
 
     int ReadExtents(string path, List<Extent> extents);
 
+    int ReadFileTable(List<MftRecord> records, Action<int>? progress, CancellationToken cancellationToken);
+
+    int ReadRecord(long id, List<Extent> extents, out RecordFacts facts);
+
     int BeginMove(string path, out IFileMover? mover);
 
     int ReadAllocated(long start, long clusters, List<FreeRun> allocated);
@@ -144,7 +148,8 @@ public sealed class SystemVolumes : IVolumeSystem
                 MediaClassifier.Classify(evidence),
                 trim,
                 evidence.Bus,
-                evidence.RotationRate));
+                evidence.RotationRate,
+                facts.SerialNumber));
         }
 
         return volumes;
@@ -225,6 +230,7 @@ public sealed class SystemVolumes : IVolumeSystem
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private readonly List<VolumeExtent> _raw = [];
         private readonly List<FoundEntry> _found = [];
+        private SafeFileHandle? _hint;
 
         public ClusterBitmap ReadBitmap()
         {
@@ -259,6 +265,50 @@ public sealed class SystemVolumes : IVolumeSystem
             int error = VolumeNative.TryOpenEntry(path, out SafeFileHandle entry);
             using (entry)
             {
+                return error != 0 ? error : Convert(entry, extents);
+            }
+        }
+
+        public int ReadFileTable(List<MftRecord> records, Action<int>? progress, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(records);
+            if (!FileTableScan.Supports(volume))
+            {
+                return VolumeNative.ErrorNotSupported;
+            }
+
+            if (_hint is null)
+            {
+                int error = VolumeNative.TryOpenEntry(volume.Root, out SafeFileHandle hint);
+                if (error != 0)
+                {
+                    hint.Dispose();
+                    return error;
+                }
+
+                _hint = hint;
+            }
+
+            return VolumeNative.TryEnumerateMft(handle, records, progress, cancellationToken);
+        }
+
+        public int ReadRecord(long id, List<Extent> extents, out RecordFacts facts)
+        {
+            facts = default;
+            if (_hint is null)
+            {
+                return VolumeNative.ErrorInvalidParameter;
+            }
+
+            int error = VolumeNative.TryOpenById(_hint, id, out SafeFileHandle entry);
+            using (entry)
+            {
+                if (error != 0)
+                {
+                    return error;
+                }
+
+                error = VolumeNative.TryReadFacts(entry, out facts);
                 return error != 0 ? error : Convert(entry, extents);
             }
         }
@@ -330,7 +380,11 @@ public sealed class SystemVolumes : IVolumeSystem
             }
         }
 
-        public void Dispose() => handle.Dispose();
+        public void Dispose()
+        {
+            _hint?.Dispose();
+            handle.Dispose();
+        }
 
         private int Convert(SafeFileHandle entry, List<Extent> extents)
         {

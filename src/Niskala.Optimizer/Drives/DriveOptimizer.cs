@@ -69,20 +69,43 @@ public sealed class DriveTrimmer(IVolumeSystem system)
         progress?.Report(new DriveProgress(DrivePhase.Trimming, Math.Clamp(percent, 0, 100), volume.Name, 0, null));
 }
 
-public sealed class DriveOptimizer(IVolumeSystem system)
+public sealed class DriveOptimizer(IVolumeSystem system, VolumeAnalysisCache? cache = null)
 {
     public const string WorkerName = "Niskala drive optimizer";
 
+    public VolumeAnalysisCache Cache { get; } = cache ?? new VolumeAnalysisCache();
+
     public IReadOnlyList<DriveVolume> Volumes() => system.FixedVolumes();
 
+    public DriveAnalysis? Cached(DriveVolume volume) => Cache.Find(volume);
+
     public Task<DriveAnalysis> AnalyzeAsync(DriveVolume volume, IProgress<DriveProgress>? progress, CancellationToken cancellationToken) =>
-        OnWorker(() => new DriveAnalyzer(system).Analyze(volume, progress, cancellationToken), background: false);
+        OnWorker(
+            () =>
+            {
+                DriveAnalysis analysis = new DriveAnalyzer(system).Analyze(volume, progress, cancellationToken);
+                Cache.Store(analysis);
+                return analysis;
+            },
+            background: false);
 
     public Task<DefragResult> DefragmentAsync(DriveAnalysis analysis, DefragMode mode, IReadOnlyCollection<string>? only, IProgress<DriveProgress>? progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(analysis);
         DriveDefragmenter.Guard(analysis.Volume);
-        return OnWorker(() => new DriveDefragmenter(system).Run(analysis, mode, only, progress, cancellationToken), background: true);
+        return OnWorker(
+            () =>
+            {
+                try
+                {
+                    return new DriveDefragmenter(system).Run(analysis, mode, only, progress, cancellationToken);
+                }
+                finally
+                {
+                    Cache.Touch(analysis);
+                }
+            },
+            background: true);
     }
 
     public Task<TrimResult> TrimAsync(DriveVolume volume, IProgress<DriveProgress>? progress, CancellationToken cancellationToken) =>

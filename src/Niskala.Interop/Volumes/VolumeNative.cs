@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
@@ -5,7 +6,20 @@ namespace Niskala.Interop.Volumes;
 
 public readonly record struct VolumeExtent(long Vcn, long NextVcn, long Lcn);
 
-public readonly record struct VolumeFacts(string Label, string FileSystem, long BytesPerCluster, long TotalClusters, long FreeClusters, long TotalBytes, long FreeBytes);
+public readonly record struct VolumeFacts(string Label, string FileSystem, long BytesPerCluster, long TotalClusters, long FreeClusters, long TotalBytes, long FreeBytes, uint SerialNumber = 0);
+
+public readonly record struct MftRecord(long Id, long Parent, FileAttributes Attributes, string Name)
+{
+    public const long RecordMask = 0x0000_FFFF_FFFF_FFFF;
+
+    public long Number => Id & RecordMask;
+
+    public bool IsDirectory => Attributes.HasFlag(FileAttributes.Directory);
+
+    public bool IsReparsePoint => Attributes.HasFlag(FileAttributes.ReparsePoint);
+}
+
+public readonly record struct RecordFacts(long Size, DateTime LastWriteUtc);
 
 public readonly record struct DiskCounters(long BytesRead, long BytesWritten, int QueueDepth, long QueryTime);
 
@@ -38,6 +52,17 @@ public static partial class VolumeNative
     private const uint FsctlGetRetrievalPointers = 0x00090073;
     private const uint FsctlMoveFile = 0x00090074;
     private const uint FsctlFileLevelTrim = 0x00098208;
+    private const uint FsctlEnumUsnData = 0x000900B3;
+
+    private const int UsnBufferBytes = 1 << 20;
+    private const ushort UsnRecordV2 = 2;
+    private const ushort UsnRecordV3 = 3;
+    private const int UsnRecordV2Header = 60;
+    private const int UsnRecordV3Header = 76;
+    private const int MftEnumDataV0Bytes = 24;
+    private const int FileIdType = 0;
+    private const int FileBasicInfoClass = 0;
+    private const int FileStandardInfoClass = 1;
 
     private const int StorageDeviceSeekPenaltyProperty = 7;
     private const int StorageDeviceTrimProperty = 8;
@@ -109,7 +134,7 @@ public static partial class VolumeNative
         string root = $"{letter}:\\";
         char* label = stackalloc char[VolumeNameLength];
         char* fileSystem = stackalloc char[VolumeNameLength];
-        if (!GetVolumeInformation(root, label, VolumeNameLength, out _, out _, out _, fileSystem, VolumeNameLength))
+        if (!GetVolumeInformation(root, label, VolumeNameLength, out uint serial, out _, out _, fileSystem, VolumeNameLength))
         {
             return Marshal.GetLastPInvokeError();
         }
@@ -132,7 +157,8 @@ public static partial class VolumeNative
             cluster > 0 ? Math.Max(totalClusters, (long)(totalBytes / (ulong)cluster)) : totalClusters,
             cluster > 0 ? Math.Max(freeClusters, (long)(freeBytes / (ulong)cluster)) : freeClusters,
             (long)totalBytes,
-            (long)freeBytes);
+            (long)freeBytes,
+            serial);
         return 0;
     }
 
@@ -298,6 +324,138 @@ public static partial class VolumeNative
         {
             NativeMemory.Free(buffer);
         }
+    }
+
+    public static unsafe int TryEnumerateMft(SafeFileHandle volume, List<MftRecord> records, Action<int>? progress, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(records);
+        var input = new MftEnumData { StartFileReferenceNumber = 0, LowUsn = 0, HighUsn = long.MaxValue, MinMajorVersion = UsnRecordV2, MaxMajorVersion = UsnRecordV3 };
+        uint inputBytes = (uint)sizeof(MftEnumData);
+        byte* buffer = (byte*)NativeMemory.Alloc(UsnBufferBytes);
+        try
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!DeviceIoControl(volume, FsctlEnumUsnData, &input, inputBytes, buffer, UsnBufferBytes, out uint returned, 0))
+                {
+                    int error = Marshal.GetLastPInvokeError();
+                    if (error == ErrorHandleEof)
+                    {
+                        return 0;
+                    }
+
+                    if (error == ErrorInvalidParameter && inputBytes != MftEnumDataV0Bytes && records.Count == 0)
+                    {
+                        inputBytes = MftEnumDataV0Bytes;
+                        continue;
+                    }
+
+                    return error;
+                }
+
+                if (returned <= sizeof(long))
+                {
+                    return 0;
+                }
+
+                long next = *(long*)buffer;
+                if (!ParseUsnRecords(new ReadOnlySpan<byte>(buffer + sizeof(long), (int)returned - sizeof(long)), records))
+                {
+                    return ErrorNotSupported;
+                }
+
+                progress?.Invoke(records.Count);
+                if (next == input.StartFileReferenceNumber)
+                {
+                    return 0;
+                }
+
+                input.StartFileReferenceNumber = next;
+            }
+        }
+        finally
+        {
+            NativeMemory.Free(buffer);
+        }
+    }
+
+    public static bool ParseUsnRecords(ReadOnlySpan<byte> buffer, List<MftRecord> records)
+    {
+        ArgumentNullException.ThrowIfNull(records);
+        int offset = 0;
+        while (buffer.Length - offset >= sizeof(uint) * 2)
+        {
+            ReadOnlySpan<byte> rest = buffer[offset..];
+            int length = (int)Math.Min(int.MaxValue, BinaryPrimitives.ReadUInt32LittleEndian(rest));
+            if (length < sizeof(uint) * 2 || length > rest.Length)
+            {
+                return false;
+            }
+
+            ReadOnlySpan<byte> record = rest[..length];
+            ushort major = BinaryPrimitives.ReadUInt16LittleEndian(record[4..]);
+            long id, parent;
+            uint attributes;
+            int nameBytes, nameOffset;
+            if (major == UsnRecordV2 && length >= UsnRecordV2Header)
+            {
+                id = BinaryPrimitives.ReadInt64LittleEndian(record[8..]);
+                parent = BinaryPrimitives.ReadInt64LittleEndian(record[16..]);
+                attributes = BinaryPrimitives.ReadUInt32LittleEndian(record[52..]);
+                nameBytes = BinaryPrimitives.ReadUInt16LittleEndian(record[56..]);
+                nameOffset = BinaryPrimitives.ReadUInt16LittleEndian(record[58..]);
+            }
+            else if (major == UsnRecordV3 && length >= UsnRecordV3Header)
+            {
+                if (BinaryPrimitives.ReadInt64LittleEndian(record[16..]) != 0 || BinaryPrimitives.ReadInt64LittleEndian(record[32..]) != 0)
+                {
+                    return false;
+                }
+
+                id = BinaryPrimitives.ReadInt64LittleEndian(record[8..]);
+                parent = BinaryPrimitives.ReadInt64LittleEndian(record[24..]);
+                attributes = BinaryPrimitives.ReadUInt32LittleEndian(record[68..]);
+                nameBytes = BinaryPrimitives.ReadUInt16LittleEndian(record[72..]);
+                nameOffset = BinaryPrimitives.ReadUInt16LittleEndian(record[74..]);
+            }
+            else
+            {
+                return false;
+            }
+
+            if (nameBytes % sizeof(char) != 0 || nameOffset + nameBytes > length)
+            {
+                return false;
+            }
+
+            records.Add(new MftRecord(id, parent, (FileAttributes)attributes, System.Text.Encoding.Unicode.GetString(record.Slice(nameOffset, nameBytes))));
+            offset += length;
+        }
+
+        return true;
+    }
+
+    public static unsafe int TryOpenById(SafeFileHandle hint, long id, out SafeFileHandle entry)
+    {
+        var descriptor = new FileIdDescriptor { Size = (uint)sizeof(FileIdDescriptor), Type = FileIdType, FileId = id };
+        entry = OpenFileById(hint, &descriptor, FileReadAttributes | Synchronize, ShareAll, 0, FlagBackupSemantics | FlagOpenReparsePoint);
+        return entry.IsInvalid ? Marshal.GetLastPInvokeError() : 0;
+    }
+
+    public static unsafe int TryReadFacts(SafeFileHandle entry, out RecordFacts facts)
+    {
+        facts = default;
+        FileBasicInformation basic;
+        FileStandardInformation standard;
+        if (!GetFileInformationByHandleEx(entry, FileBasicInfoClass, &basic, (uint)sizeof(FileBasicInformation))
+            || !GetFileInformationByHandleEx(entry, FileStandardInfoClass, &standard, (uint)sizeof(FileStandardInformation)))
+        {
+            return Marshal.GetLastPInvokeError();
+        }
+
+        facts = new RecordFacts(standard.EndOfFile, DateTime.FromFileTimeUtc(Math.Max(0, basic.LastWriteTime)));
+        return 0;
     }
 
     public static unsafe int TryGetExtents(SafeFileHandle entry, List<VolumeExtent> extents)
@@ -516,6 +674,59 @@ public static partial class VolumeNative
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static unsafe partial bool SetFileInformationByHandle(SafeFileHandle file, int infoClass, void* info, uint size);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool GetFileInformationByHandleEx(SafeFileHandle file, int infoClass, void* info, uint size);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    private static unsafe partial SafeFileHandle OpenFileById(SafeFileHandle hint, FileIdDescriptor* id, uint access, uint share, nint security, uint flags);
+
+    [StructLayout(LayoutKind.Explicit, Size = 32)]
+    private struct MftEnumData
+    {
+        [FieldOffset(0)]
+        public long StartFileReferenceNumber;
+
+        [FieldOffset(8)]
+        public long LowUsn;
+
+        [FieldOffset(16)]
+        public long HighUsn;
+
+        [FieldOffset(24)]
+        public ushort MinMajorVersion;
+
+        [FieldOffset(26)]
+        public ushort MaxMajorVersion;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 24)]
+    private struct FileIdDescriptor
+    {
+        [FieldOffset(0)]
+        public uint Size;
+
+        [FieldOffset(4)]
+        public int Type;
+
+        [FieldOffset(8)]
+        public long FileId;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 40)]
+    private struct FileBasicInformation
+    {
+        [FieldOffset(16)]
+        public long LastWriteTime;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 24)]
+    private struct FileStandardInformation
+    {
+        [FieldOffset(8)]
+        public long EndOfFile;
+    }
 
     [StructLayout(LayoutKind.Explicit, Size = 12)]
     private struct StoragePropertyQuery

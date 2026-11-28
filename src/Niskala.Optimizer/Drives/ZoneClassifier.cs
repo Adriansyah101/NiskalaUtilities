@@ -69,25 +69,23 @@ public static class ProtectedFiles
 {
     public const string VolumeInformation = "System Volume Information";
 
-    private static readonly FrozenSet<string> RootNames = FrozenSet.ToFrozenSet(
-        ["pagefile.sys", "hiberfil.sys", "swapfile.sys", "$MFT", "$MFTMirr", "$LogFile", "$Volume", "$AttrDef", "$Bitmap", "$Boot", "$BadClus", "$Secure", "$UpCase", "$Extend", "System Volume Information"],
+    private static readonly FrozenSet<string> SystemNames = FrozenSet.ToFrozenSet(
+        ["pagefile.sys", "hiberfil.sys", "swapfile.sys", "$MFT", "$MFTMirr", "$LogFile", "$Volume", "$AttrDef", "$Bitmap", "$Boot", "$BadClus", "$Secure", "$UpCase", "$Extend", VolumeInformation],
         StringComparer.OrdinalIgnoreCase);
 
-    public static IReadOnlyCollection<string> Names => RootNames;
+    private static readonly FrozenSet<string>.AlternateLookup<ReadOnlySpan<char>> SystemNameSpans = SystemNames.GetAlternateLookup<ReadOnlySpan<char>>();
+
+    public static IReadOnlyCollection<string> Names => SystemNames;
+
+    public static bool IsProtectedName(ReadOnlySpan<char> name) => SystemNameSpans.Contains(name);
 
     public static bool IsProtected(string relativePath)
     {
         ArgumentNullException.ThrowIfNull(relativePath);
-        string trimmed = relativePath.TrimStart('\\', '/');
-        int separator = trimmed.IndexOfAny(['\\', '/']);
-        return RootNames.Contains(separator < 0 ? trimmed : trimmed[..separator]) || HasVolumeInformation(trimmed);
-    }
-
-    private static bool HasVolumeInformation(string relativePath)
-    {
-        foreach (Range part in relativePath.AsSpan().SplitAny('\\', '/'))
+        ReadOnlySpan<char> path = relativePath;
+        foreach (Range part in path.SplitAny('\\', '/'))
         {
-            if (relativePath.AsSpan()[part].Equals(VolumeInformation, StringComparison.OrdinalIgnoreCase))
+            if (IsProtectedName(path[part]))
             {
                 return true;
             }

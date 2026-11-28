@@ -17,15 +17,19 @@ public sealed class ProtectedFileTests
     [InlineData("PAGEFILE.SYS")]
     [InlineData(@"Backup\Recovered\Lost Partition 6(NTFS)\System Volume Information\tracking.log")]
     [InlineData(@"Backup\system volume information")]
+    [InlineData(@"Users\pagefile.sys")]
+    [InlineData(@"Backup\$MFT")]
+    [InlineData(@"Images\Old\$Extend\$ObjId")]
+    [InlineData(@"Old\hiberfil.sys")]
     public void Kernel_owned_files_are_left_out(string relative) => Assert.True(ProtectedFiles.IsProtected(relative));
 
     [Theory]
-    [InlineData(@"Users\pagefile.sys")]
     [InlineData(@"Windows\System32\kernel32.dll")]
     [InlineData("pagefile.sys.bak")]
     [InlineData("data.iso")]
     [InlineData(@"Notes\System Volume Information.txt")]
-    [InlineData(@"Backup\$MFT")]
+    [InlineData(@"Backup\$MFT.copy")]
+    [InlineData(@"Docs\my pagefile.sys")]
     public void Ordinary_files_are_scanned(string relative) => Assert.False(ProtectedFiles.IsProtected(relative));
 }
 

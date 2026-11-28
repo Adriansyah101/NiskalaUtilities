@@ -16,7 +16,7 @@ public static class DefragPlanner
 {
     public const long CompactMaxBytes = 64L << 20;
 
-    private static readonly SpeedZone[] PlacementOrder = [SpeedZone.Archive, SpeedZone.Fast, SpeedZone.Standard];
+    private static readonly SpeedZone[] PlacementOrder = [SpeedZone.Archive, SpeedZone.Standard, SpeedZone.Fast];
 
     public static IReadOnlyList<PlannedMove> Plan(DriveAnalysis analysis, DefragMode mode, IReadOnlyCollection<string>? only = null)
     {
@@ -48,7 +48,7 @@ public static class DefragPlanner
         {
             var planned = plan.Select(p => p.File).ToHashSet();
             plan.AddRange(movable
-                .Where(f => !planned.Contains(f) && !f.IsFragmented && f.Size <= CompactMaxBytes)
+                .Where(f => f.Size <= CompactMaxBytes && (planned.Contains(f) || !f.IsFragmented))
                 .OrderBy(f => f.StartLcn)
                 .Select(f => new PlannedMove(f, MovePurpose.Compact, f.Zone)));
         }
@@ -71,7 +71,7 @@ public static class DefragPlanner
         switch (move.Purpose)
         {
             case MovePurpose.Defragment:
-                return free.BestFit(clusters);
+                return mode == DefragMode.Quick ? free.BestFit(clusters) : free.FirstFit(clusters);
             case MovePurpose.Place:
                 (long from, long to) = layout.Range(move.Zone);
                 return free.FirstFit(clusters, from, to) ?? (file.IsFragmented ? free.BestFit(clusters) : null);
@@ -105,6 +105,8 @@ public static class DefragPlanner
 
 public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleController>? throttle = null)
 {
+    public const long FinishLimitBytes = 2L << 30;
+
     private const int Attempts = 3;
 
     private static readonly TimeSpan ReportEvery = TimeSpan.FromMilliseconds(120);
@@ -158,21 +160,51 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
             }
 
             bool wasFragmented = move.File.IsFragmented;
-            MoveOutcome outcome = Execute(session, analysis, move, mode, controller, tally, cancellationToken);
-            tally.Count(outcome, wasFragmented && !move.File.IsFragmented);
+            bool stopping = false;
+            double percent = index * 100.0 / plan.Count;
+            MoveOutcome outcome = Execute(session, analysis, move, mode, controller, tally, Stopping, cancellationToken);
+            tally.Count(move.File, outcome, outcome == MoveOutcome.Moved && wasFragmented && !move.File.IsFragmented);
+
+            void Stopping()
+            {
+                if (!stopping)
+                {
+                    stopping = true;
+                    progress?.Report(new DriveProgress(DrivePhase.Stopping, percent, move.File.Path, analysis.Map.Version, analysis.Map));
+                }
+            }
         }
+
+        tally.Cancelled |= cancellationToken.IsCancellationRequested;
 
         progress?.Report(new DriveProgress(DrivePhase.Finished, 100, analysis.Volume.Name, analysis.Map.Version, analysis.Map));
         return new DefragResult(mode, plan.Count, tally.Moved, tally.Defragmented, tally.Locked, tally.NoRoom, tally.Failed, tally.Clusters, tally.Cancelled, clock.Elapsed);
     }
 
-    private static MoveOutcome Execute(IVolumeSession session, DriveAnalysis analysis, PlannedMove move, DefragMode mode, IoThrottleController controller, Tally tally, CancellationToken cancellationToken)
+    public static bool FinishesOnCancel(DriveFile file, long bytesPerCluster)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        return file.Clusters * Math.Max(1, bytesPerCluster) <= FinishLimitBytes;
+    }
+
+    private static MoveOutcome Execute(IVolumeSession session, DriveAnalysis analysis, PlannedMove move, DefragMode mode, IoThrottleController controller, Tally tally, Action stopping, CancellationToken cancellationToken)
     {
         DriveFile file = move.File;
         bool movedAny = false;
         for (int attempt = 0; attempt < Attempts; attempt++)
         {
-            if (DefragPlanner.Target(analysis, move, mode) is not { } target)
+            long? planned = DefragPlanner.Target(analysis, move, mode);
+            if (planned is not null && attempt == 0 && Resync(session, analysis, file))
+            {
+                if (!file.IsMovable || (move.Purpose == MovePurpose.Defragment && !file.IsFragmented))
+                {
+                    return MoveOutcome.AlreadyPlaced;
+                }
+
+                planned = DefragPlanner.Target(analysis, move, mode);
+            }
+
+            if (planned is not { } target)
             {
                 return move.Purpose == MovePurpose.Compact ? MoveOutcome.AlreadyPlaced : MoveOutcome.NoRoom;
             }
@@ -185,6 +217,7 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
 
             long clusters = file.Clusters;
             long bytesPerCluster = Math.Max(1, analysis.Volume.BytesPerCluster);
+            bool finish = FinishesOnCancel(file, bytesPerCluster);
             analysis.Free.Allocate(target, clusters);
             long moved = 0;
             MoveStep failed = default;
@@ -194,7 +227,12 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        break;
+                        if (!finish || (!movedAny && moved == 0))
+                        {
+                            break;
+                        }
+
+                        stopping();
                     }
 
                     error = mover.Move(step.Vcn, step.Lcn, step.Clusters);
@@ -226,6 +264,11 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
 
             if (taken)
             {
+                if (cancellationToken.IsCancellationRequested && !(finish && movedAny))
+                {
+                    return movedAny ? MoveOutcome.Moved : MoveOutcome.AlreadyPlaced;
+                }
+
                 continue;
             }
 
@@ -246,6 +289,18 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
         }
 
         return movedAny ? MoveOutcome.Moved : MoveOutcome.Failed;
+    }
+
+    internal static bool Resync(IVolumeSession session, DriveAnalysis analysis, DriveFile file)
+    {
+        var current = new List<Extent>();
+        if (session.ReadExtents(file.Path, current) != 0 || current.SequenceEqual(file.Extents))
+        {
+            return false;
+        }
+
+        Reconcile(analysis, file, file.Extents, [.. current], 0, 0, keepReservation: true);
+        return true;
     }
 
     internal static bool TakenSinceAnalysis(IVolumeSession session, DriveAnalysis analysis, long start, long clusters)
@@ -318,7 +373,9 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
 
     private sealed class Tally
     {
-        public int Moved { get; private set; }
+        private readonly HashSet<DriveFile> _moved = [];
+
+        public int Moved => _moved.Count;
 
         public int Defragmented { get; private set; }
 
@@ -332,12 +389,12 @@ public sealed class DriveDefragmenter(IVolumeSystem system, Func<IoThrottleContr
 
         public bool Cancelled { get; set; }
 
-        public void Count(MoveOutcome outcome, bool joined)
+        public void Count(DriveFile file, MoveOutcome outcome, bool joined)
         {
             switch (outcome)
             {
                 case MoveOutcome.Moved:
-                    Moved++;
+                    _moved.Add(file);
                     break;
                 case MoveOutcome.Locked:
                     Locked++;
