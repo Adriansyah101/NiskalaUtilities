@@ -44,6 +44,8 @@ public static class MediaClassifier
 
     public static bool IsFlashBus(StorageBus bus) => FlashBuses.Contains(bus);
 
+    public static bool IsBridged(StorageBus bus) => BridgedBuses.Contains(bus);
+
     public static bool IsSolidStateName(string? device) =>
         !string.IsNullOrWhiteSpace(device) && SolidStateNames.Any(name => device.Contains(name, StringComparison.OrdinalIgnoreCase));
 

@@ -43,6 +43,8 @@
           <SolidColorBrush x:Key="NiskalaMapFragmentedBrush" Color="#EF6A63" />
           <SolidColorBrush x:Key="NiskalaMapArchiveBrush" Color="#A889EC" />
           <SolidColorBrush x:Key="NiskalaMapSystemBrush" Color="#7C8190" />
+          <SolidColorBrush x:Key="NiskalaMapReservedBrush" Color="#D9A441" />
+          <SolidColorBrush x:Key="NiskalaMapCompressedBrush" Color="#3FB9A8" />
           <SolidColorBrush x:Key="ContentDialogBackground" Color="#121317" />
           <SolidColorBrush x:Key="ContentDialogTopOverlay" Color="#191B21" />
           <SolidColorBrush x:Key="ContentDialogBorderBrush" Color="#25272F" />
@@ -95,6 +97,8 @@
           <SolidColorBrush x:Key="NiskalaMapFragmentedBrush" Color="#CF3439" />
           <SolidColorBrush x:Key="NiskalaMapArchiveBrush" Color="#7650C8" />
           <SolidColorBrush x:Key="NiskalaMapSystemBrush" Color="#6F7484" />
+          <SolidColorBrush x:Key="NiskalaMapReservedBrush" Color="#B07A12" />
+          <SolidColorBrush x:Key="NiskalaMapCompressedBrush" Color="#138A7A" />
           <SolidColorBrush x:Key="ContentDialogBackground" Color="#F5F6F8" />
           <SolidColorBrush x:Key="ContentDialogTopOverlay" Color="#FFFFFF" />
           <SolidColorBrush x:Key="ContentDialogBorderBrush" Color="#E2E4EA" />

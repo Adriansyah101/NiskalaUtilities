@@ -47,13 +47,13 @@ Windows 10 and 11 (x64, ARM64) · English & Bahasa Indonesia · Dark & Light The
 
 | File | What it is |
 |---|---|
-| `NiskalaUtilities-Setup-v0.3.3-win-x64.exe` | The official installer for 64-bit Windows 10 and 11 PCs (Intel / AMD), with a Start menu shortcut and an optional desktop shortcut. |
+| `NiskalaUtilities-Setup-v0.3.4-win-x64.exe` | The official installer for 64-bit Windows 10 and 11 PCs (Intel / AMD), with a Start menu shortcut and an optional desktop shortcut. |
 | `SHA256SUMS.txt` | The SHA-256 checksum of the installer, to verify that your download is the published file. |
 
 Compare the hash with the line in `SHA256SUMS.txt`:
 
 ```powershell
-(Get-FileHash .\NiskalaUtilities-Setup-v0.3.3-win-x64.exe -Algorithm SHA256).Hash
+(Get-FileHash .\NiskalaUtilities-Setup-v0.3.4-win-x64.exe -Algorithm SHA256).Hash
 ```
 
 > [!NOTE]
@@ -69,7 +69,7 @@ Compare the hash with the line in `SHA256SUMS.txt`:
 | | **Niskala Utilities** | **Built-in Windows tools** | **Proprietary commercial utilities** |
 |---|---|---|---|
 | **Uninstall & leftover cleanup** | Six steps: fingerprint, restore point, live process tree, leftover scan, leftover files, leftover registry. Kernel ETW install tracking gives an exact rollback, and every removal is journaled and can be restored. | Runs the program's own uninstaller; the folders, keys, services and tasks it leaves behind stay. | Leftover scans are common; install tracing and a per-item undo vary by product and edition. |
-| **Drive optimization** | Tells hard disks from SSDs automatically, also behind USB bridges. A Strategy Guide picks the right mode, the live cluster map shows which files fill each block, S.M.A.R.T. telemetry reports health, temperature and wear, and several drives run in one queue. TRIM only on SSDs, never a cluster move. | Optimize Drives defragments hard disks and retrims SSDs on a schedule, without a file list or cluster map. | Cluster maps are common; how SSDs are handled differs from tool to tool. |
+| **Drive optimization** | Opens at once and tells hard disks from SSDs per drive in the background, also behind USB bridges. A drive table rates each drive, a Strategy Guide drawer applies the right mode, the cluster map marks MFT reserved areas and compressed files, S.M.A.R.T. is read through SAT and NVMe USB bridges, and a Task Scheduler plan keeps drives tidy. TRIM only on SSDs, never a cluster move. | Optimize Drives defragments hard disks and retrims SSDs on a schedule, without a file list or cluster map. | Cluster maps are common; how SSDs are handled differs from tool to tool. |
 | **System repair** | `DISM`, `SFC`, Winsock and IP reset, DNS flush and `CHKDSK /scan` from a closed, safe list that never adds a destructive switch, with a local `.wim` / `.esd` repair source, live progress and explained error codes. | The same tools, typed by hand in an elevated console, with raw output. | Varies by product; the commands behind a fix button are not always shown. |
 | **Architecture & footprint** | Native AOT machine code in one installer. No background service, tray agent, scheduled task or startup entry: nothing runs while the app is closed. | Part of Windows. | Often a resident tray agent or background service for monitoring and updates. |
 | **Price, ads & telemetry** | Free forever, open source under GPL-3.0. No ads, no account, no telemetry; the only network request is the GitHub release check, which you can turn off. | Included with Windows; diagnostic data follows the Windows privacy settings. | Usually a free tier with upsells or a subscription; data collection depends on the vendor. |
@@ -100,7 +100,7 @@ bottom left of the sidebar; the theme button next to it switches between the **D
 | **Registry Integrity** | Finds file types, shared files, COM classes, firewall rules and services that point at missing programs, and repairs them with a backup. |
 | **Resource Control** | Startup entries, third-party services, scheduled tasks and context-menu handlers with a boot-impact estimate and one switch each. |
 | **Process Suspend** | Freezes, throttles with efficiency mode or caps the CPU of idle background programs, and resumes them even after a restart of Niskala. |
-| **Drive Optimizer** | Defragments hard disks with speed zones and a clickable cluster map, recommends a strategy per drive, reads S.M.A.R.T. health and temperature, queues several drives in one run and sends only TRIM to SSDs. |
+| **Drive Optimizer** | Defragments hard disks with speed zones and a clickable cluster map, recommends a strategy per drive, reads S.M.A.R.T. health also through USB bridges, queues several drives, runs on a weekly, monthly or idle schedule and sends only TRIM to SSDs. |
 | **System Repair** | Windows' own repair tools from a fixed, safe list, with live progress, a console-like log and plain explanations of failures. |
 | **History & Backups** | Every removal, clean, registry repair and switch is a journaled transaction; restore what can come back with one click. |
 | **Updates** | Checks GitHub for a new release, verifies its SHA-256 checksum and installs it in place. |

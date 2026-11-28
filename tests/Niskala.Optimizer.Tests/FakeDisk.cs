@@ -39,6 +39,12 @@ internal sealed class FakeDisk : IVolumeSystem
 
     public HashSet<string> WithoutExtents { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    public HashSet<string> Compressed { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public List<FreeRun> ReservedZone { get; } = [];
+
+    public List<(long Lcn, long Clusters)> MetadataRuns { get; } = [];
+
     public int FileTableReads { get; private set; }
 
     public List<long> RecordReads { get; } = [];
@@ -141,6 +147,18 @@ internal sealed class FakeDisk : IVolumeSystem
         Name(relative);
         Volume = Volume with { FreeBytes = _used.Count(u => !u) * Volume.BytesPerCluster };
         return this;
+    }
+
+    public FakeDisk Compress(string relative)
+    {
+        Compressed.Add(Path.Join(Root, relative));
+        return this;
+    }
+
+    public FakeDisk Metadata(long lcn, long clusters)
+    {
+        MetadataRuns.Add((lcn, clusters));
+        return Reserve(lcn, clusters);
     }
 
     public FakeDisk Reserve(long lcn, long clusters)
@@ -288,7 +306,7 @@ internal sealed class FakeDisk : IVolumeSystem
             {
                 if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !path[prefix.Length..].Contains('\\'))
                 {
-                    entries.Add(new VolumeEntry(path[prefix.Length..], folder, link, size, written));
+                    entries.Add(new VolumeEntry(path[prefix.Length..], folder, link, size, written, disk.Compressed.Contains(path)));
                 }
             }
 
@@ -329,7 +347,7 @@ internal sealed class FakeDisk : IVolumeSystem
                     continue;
                 }
 
-                FileAttributes attributes = (entry.Directory ? FileAttributes.Directory : FileAttributes.Archive) | (entry.Link ? FileAttributes.ReparsePoint : 0);
+                FileAttributes attributes = (entry.Directory ? FileAttributes.Directory : FileAttributes.Archive) | (entry.Link ? FileAttributes.ReparsePoint : 0) | (disk.Compressed.Contains(path) ? FileAttributes.Compressed : 0);
                 records.Add(new MftRecord(id, disk.ParentId(path), attributes, Path.GetFileName(path)));
                 progress?.Invoke(records.Count);
             }
@@ -347,6 +365,12 @@ internal sealed class FakeDisk : IVolumeSystem
             }
 
             int emitted = 0;
+            foreach ((long lcn, long clusters) in disk.MetadataRuns)
+            {
+                record(new FileRecord(new MftRecord(Sequence + emitted, RootId, FileAttributes.Hidden | FileAttributes.System, "$Meta"), clusters * disk.Volume.BytesPerCluster, Now, [new Extent(0, lcn, clusters)]));
+                progress?.Invoke(++emitted);
+            }
+
             foreach ((string path, long id) in disk._ids.OrderBy(p => p.Value))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -360,7 +384,7 @@ internal sealed class FakeDisk : IVolumeSystem
                     return disk.DirectRecordsError;
                 }
 
-                FileAttributes attributes = (entry.Directory ? FileAttributes.Directory : FileAttributes.Archive) | (entry.Link ? FileAttributes.ReparsePoint : 0);
+                FileAttributes attributes = (entry.Directory ? FileAttributes.Directory : FileAttributes.Archive) | (entry.Link ? FileAttributes.ReparsePoint : 0) | (disk.Compressed.Contains(path) ? FileAttributes.Compressed : 0);
                 Extent[]? extents = disk.WithoutExtents.Contains(path) ? null
                     : disk._files.TryGetValue(path, out long[]? map) ? [.. Extents(map)]
                     : [];
@@ -422,6 +446,17 @@ internal sealed class FakeDisk : IVolumeSystem
         }
 
         public long FileRecords() => disk.Records;
+
+        public int ReadReserved(List<FreeRun> reserved)
+        {
+            if (disk.ReservedZone.Count == 0)
+            {
+                return VolumeNative.ErrorNotSupported;
+            }
+
+            reserved.AddRange(disk.ReservedZone);
+            return 0;
+        }
 
         public IoSample? SampleIo() => disk.BusyQueue is { } queue
             ? new IoSample(0, 0, queue, TimeSpan.FromSeconds(++disk._samples))

@@ -34,6 +34,8 @@ public sealed partial class StrategyRowCollection : ObservableCollection<Strateg
 
 public sealed partial class OccupantRowCollection : ObservableCollection<OccupantRow>;
 
+public sealed partial class AttributeRowCollection : ObservableCollection<AttributeRow>;
+
 public sealed partial class RepairRowCollection : ObservableCollection<RepairRow>;
 
 public sealed partial class LogLineCollection : ObservableCollection<LogLine>;

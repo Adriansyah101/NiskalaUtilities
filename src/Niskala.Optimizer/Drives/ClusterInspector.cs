@@ -6,11 +6,12 @@ public enum OccupantState
     Fragmented,
     Archive,
     SystemLocked,
+    Compressed,
 }
 
 public sealed record ClusterOccupant(string Path, long Size, int Fragments, OccupantState State, long ClustersInRange, long FirstLcn);
 
-public sealed record ClusterInspection(long Start, long End, long FreeClusters, long UnlistedClusters, int TotalFiles, IReadOnlyList<ClusterOccupant> Files)
+public sealed record ClusterInspection(long Start, long End, long FreeClusters, long UnlistedClusters, int TotalFiles, IReadOnlyList<ClusterOccupant> Files, long ReservedClusters = 0)
 {
     public long Clusters => End - Start;
 
@@ -29,6 +30,7 @@ public static class ClusterInspector
         ArgumentNullException.ThrowIfNull(file);
         return file.IsLocked ? OccupantState.SystemLocked : file.State switch
         {
+            ClusterState.Compressed => OccupantState.Compressed,
             ClusterState.Fragmented => OccupantState.Fragmented,
             ClusterState.Archive => OccupantState.Archive,
             _ => OccupantState.Contiguous,
@@ -79,6 +81,9 @@ public static class ClusterInspector
 
         long allocated = end > start ? analysis.Bitmap.CountAllocated(start, end - start) : 0;
         ClusterOccupant[] rows = [.. hits.OrderByDescending(h => h.ClustersInRange).ThenBy(h => h.FirstLcn).ThenBy(h => h.Path, StringComparer.OrdinalIgnoreCase).Take(limit)];
-        return new ClusterInspection(start, end, end - start - allocated, Math.Max(0, allocated - owned), hits.Count, rows);
+        long free = end - start - allocated;
+        long unlisted = Math.Max(0, allocated - owned);
+        long reserved = Math.Min(ReservedArea.Overlap(analysis.Reserved, start, end), free + unlisted);
+        return new ClusterInspection(start, end, free, unlisted, hits.Count, rows, reserved);
     }
 }

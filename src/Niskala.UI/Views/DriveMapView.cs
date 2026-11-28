@@ -63,6 +63,8 @@ public sealed partial class DriveMapView : Grid
     public static readonly DependencyProperty FragmentedBrushProperty = Register(nameof(FragmentedBrush));
     public static readonly DependencyProperty ArchiveBrushProperty = Register(nameof(ArchiveBrush));
     public static readonly DependencyProperty SystemBrushProperty = Register(nameof(SystemBrush));
+    public static readonly DependencyProperty ReservedBrushProperty = Register(nameof(ReservedBrush));
+    public static readonly DependencyProperty CompressedBrushProperty = Register(nameof(CompressedBrush));
     public static readonly DependencyProperty HighlightBrushProperty = Register(nameof(HighlightBrush));
 
     private const int BytesPerPixel = 4;
@@ -126,6 +128,18 @@ public sealed partial class DriveMapView : Grid
     {
         get => (Brush?)GetValue(SystemBrushProperty);
         set => SetValue(SystemBrushProperty, value);
+    }
+
+    public Brush? ReservedBrush
+    {
+        get => (Brush?)GetValue(ReservedBrushProperty);
+        set => SetValue(ReservedBrushProperty, value);
+    }
+
+    public Brush? CompressedBrush
+    {
+        get => (Brush?)GetValue(CompressedBrushProperty);
+        set => SetValue(CompressedBrushProperty, value);
     }
 
     public Brush? HighlightBrush
@@ -260,7 +274,7 @@ public sealed partial class DriveMapView : Grid
             _pixels = new byte[grid.PixelWidth * grid.PixelHeight * BytesPerPixel];
         }
 
-        Span<uint> palette = [Pixel(FreeBrush), Pixel(UsedBrush), Pixel(FragmentedBrush), Pixel(ArchiveBrush), Pixel(SystemBrush)];
+        Span<uint> palette = [Pixel(FreeBrush), Pixel(UsedBrush), Pixel(FragmentedBrush), Pixel(ArchiveBrush), Pixel(SystemBrush), Pixel(ReservedBrush), Pixel(CompressedBrush)];
         Span<uint> pixels = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(_pixels.AsSpan());
         pixels.Clear();
         for (int index = 0; index < states.Length && index < grid.Cells; index++)

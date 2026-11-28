@@ -234,7 +234,7 @@ public sealed class DriveOptimizerPageTests
         var summary = new DriveSummary(1_000_000, 400_000, 1_200, 34, 120, 12.5, 500_000, 100, 1_000, 100, 4, 2, 1);
         IReadOnlyList<SummaryRow> rows = DriveOptimizerViewModel.SummaryRows(Strings.For(false), Volume(MediaKind.Hdd), summary, DateTimeOffset.Now);
 
-        Assert.Equal(10, rows.Count);
+        Assert.Equal(14, rows.Count);
         Assert.All(rows, r => Assert.False(string.IsNullOrWhiteSpace(r.Label) || string.IsNullOrWhiteSpace(r.Value)));
         Assert.Contains(rows, r => r.Label == "Excess fragments" && r.Value == "120");
         Assert.Contains(rows, r => r.Label == "Largest free block" && r.Value.Contains("GB", StringComparison.Ordinal));
@@ -287,13 +287,12 @@ public sealed class DriveOptimizerPageTests
     }
 
     [Theory]
-    [InlineData(false, true, DriveOptimizerViewModel.TabSummary, DriveOptimizerViewModel.TabFragments)]
-    [InlineData(true, true, DriveOptimizerViewModel.TabSummary, DriveOptimizerViewModel.TabSummary)]
-    [InlineData(true, true, DriveOptimizerViewModel.TabFragments, DriveOptimizerViewModel.TabFragments)]
-    [InlineData(true, false, DriveOptimizerViewModel.TabFragments, DriveOptimizerViewModel.TabSummary)]
-    [InlineData(false, false, DriveOptimizerViewModel.TabFragments, DriveOptimizerViewModel.TabSummary)]
-    public void Moving_to_a_hard_disk_opens_its_fragmented_files(bool wasHdd, bool isHdd, int current, int expected) =>
-        Assert.Equal(expected, DriveOptimizerViewModel.TabFor(wasHdd, isHdd, current));
+    [InlineData(true, DriveOptimizerViewModel.TabSummary, DriveOptimizerViewModel.TabSummary)]
+    [InlineData(true, DriveOptimizerViewModel.TabFragments, DriveOptimizerViewModel.TabFragments)]
+    [InlineData(false, DriveOptimizerViewModel.TabFragments, DriveOptimizerViewModel.TabMap)]
+    [InlineData(false, DriveOptimizerViewModel.TabSummary, DriveOptimizerViewModel.TabSummary)]
+    public void Only_hard_disks_keep_the_fragmented_files_view(bool isHdd, int current, int expected) =>
+        Assert.Equal(expected, DriveOptimizerViewModel.TabFor(isHdd, current));
 
     [Theory]
     [InlineData(0, "0%")]

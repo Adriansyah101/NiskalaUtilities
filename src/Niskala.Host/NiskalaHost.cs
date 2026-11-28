@@ -246,6 +246,8 @@ public sealed class NiskalaHost : IDisposable
 
     public static DriveOptimizer CreateDriveOptimizer() => new(SystemVolumes.Instance, health: SystemDriveHealth.Instance);
 
+    public static MaintenanceScheduler CreateMaintenanceScheduler() => new(SystemMaintenanceTasks.Instance);
+
     public SizeQueue CreateSizeQueue() => SizeQueue.Create(new DiskKindProbe(), FolderSizeCache.Load(FolderSizeCache.DefaultFile, Logger<FolderSizeCache>()));
 
     public UpdateService CreateUpdateService() => new(Logger<UpdateService>());

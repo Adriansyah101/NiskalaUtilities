@@ -10,6 +10,14 @@ using Niskala.UI.Services;
 
 namespace Niskala.UI.ViewModels;
 
+public enum ProbeState
+{
+    Detecting,
+    Waiting,
+    Failed,
+    Ready,
+}
+
 public sealed partial class DriveRow : ObservableObject
 {
     private readonly Action? _queued;
@@ -18,15 +26,30 @@ public sealed partial class DriveRow : ObservableObject
     {
         Volume = volume;
         _queued = queued;
+        Probe = volume.Probed ? ProbeState.Ready : ProbeState.Detecting;
     }
 
     public DriveVolume Volume { get; private set; }
 
+    public ProbeState Probe { get; private set; }
+
+    public DriveHealth? Health { get; private set; }
+
+    public DriveSummary? Summary { get; private set; }
+
+    public DateTimeOffset? AnalyzedAt { get; private set; }
+
     public string Name => Volume.Name;
+
+    public string Label => string.IsNullOrWhiteSpace(Volume.Label) ? Strings.Current.NoValue : Volume.Label;
 
     public string Title => string.IsNullOrWhiteSpace(Volume.Label) ? Volume.Name : $"{Volume.Name}  {Volume.Label}";
 
-    public string Media => Strings.Current.MediaName(Volume.Media);
+    public bool IsDetecting => Probe is ProbeState.Detecting or ProbeState.Waiting;
+
+    public bool CanAnalyze => Probe is ProbeState.Ready or ProbeState.Failed;
+
+    public string Media => Probe == ProbeState.Ready ? Strings.Current.MediaName(Volume.Media) : Strings.Current.NoValue;
 
     public bool IsSsd => Volume.Media == MediaKind.Ssd;
 
@@ -42,27 +65,76 @@ public sealed partial class DriveRow : ObservableObject
 
     public string QueueName => Strings.Current.QueueCheckName(Volume.Name);
 
-    [ObservableProperty]
-    public partial string Fragmentation { get; set; } = Strings.Current.DriveNotAnalyzed;
+    public bool HasWarning => Health?.Status == HealthStatus.Warning;
+
+    public string Status => StatusText(Strings.Current, IsBusy, Probe, HasWarning, Summary is not null);
+
+    public string LastAnalysis => AnalyzedAt is { } when ? Format.When(when) : Strings.Current.NoValue;
+
+    public string TotalFiles => Summary is { } summary ? Format.Number(summary.Files) : Strings.Current.NoValue;
+
+    public string FragmentedFiles => Summary is { } summary ? Format.Number(summary.FragmentedFiles) : Strings.Current.NoValue;
+
+    public string FreeFragments => Summary is { } summary ? Format.Number(summary.FreeFragments) : Strings.Current.NoValue;
+
+    public string Fragmentation => Summary is { } summary ? Format.Percent(summary.FragmentedPercent) : Strings.Current.NoValue;
+
+    public string Assessment => Summary is { } summary ? Strings.Current.AssessmentName(DriveAssessor.Assess(summary)) : Strings.Current.NoValue;
 
     [ObservableProperty]
     public partial bool IsQueued { get; set; }
 
-    internal double? FragmentedPercent { get; set; }
+    [ObservableProperty]
+    public partial bool IsBusy { get; set; }
+
+    public static string StatusText(Strings strings, bool busy, ProbeState probe, bool warning, bool analyzed)
+    {
+        ArgumentNullException.ThrowIfNull(strings);
+        return busy ? strings.StatusWorking : probe switch
+        {
+            ProbeState.Detecting => strings.StatusDetecting,
+            ProbeState.Waiting => strings.StatusWaiting,
+            ProbeState.Failed => strings.StatusNoResponse,
+            _ when warning => strings.StatusHealthWarning,
+            _ => analyzed ? strings.StatusAnalyzed : strings.DriveNotAnalyzed,
+        };
+    }
 
     internal void Update(DriveVolume volume)
     {
         Volume = volume;
+        if (volume.Probed)
+        {
+            Probe = ProbeState.Ready;
+        }
+
         Relabel();
     }
 
-    internal void Relabel()
+    internal void SetProbe(ProbeState probe)
     {
-        Fragmentation = FragmentedPercent is { } percent ? Strings.Current.DriveFragmented(percent) : Strings.Current.DriveNotAnalyzed;
-        OnPropertyChanged(string.Empty);
+        Probe = probe;
+        Relabel();
     }
 
+    internal void SetHealth(DriveHealth health)
+    {
+        Health = health;
+        Relabel();
+    }
+
+    internal void Show(DriveAnalysis? analysis)
+    {
+        Summary = analysis?.Summary();
+        AnalyzedAt = analysis?.AnalyzedAt;
+        Relabel();
+    }
+
+    internal void Relabel() => OnPropertyChanged(string.Empty);
+
     partial void OnIsQueuedChanged(bool value) => _queued?.Invoke();
+
+    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(Status));
 }
 
 public sealed partial class FragmentRow : ObservableObject
@@ -106,18 +178,15 @@ public sealed record SummaryRow(string Label, string Value);
 
 public sealed class StrategyRow
 {
-    internal StrategyRow(StrategyOption option, bool active, Action<StrategyGoal> apply)
+    internal StrategyRow(StrategyOption option, Action<StrategyGoal> choose)
     {
         Option = option;
-        IsActive = active;
-        Apply = new RelayCommand(() => apply(option.Goal), () => option.CanApply && !active);
+        Apply = new RelayCommand(() => choose(option.Goal), () => option.CanApply);
     }
 
     public StrategyOption Option { get; }
 
     public StrategyGoal Goal => Option.Goal;
-
-    public bool IsActive { get; }
 
     public bool IsRecommended => Option.Fit == StrategyFit.Recommended;
 
@@ -131,9 +200,30 @@ public sealed class StrategyRow
 
     public string ModeText => Strings.Current.ModeName(Option.Mode);
 
-    public string ApplyText => IsActive ? Strings.Current.GuideActive : Strings.Current.GuideApply;
+    public string ApplyText => Strings.Current.GuideChoose;
 
     public RelayCommand Apply { get; }
+}
+
+public sealed class AttributeRow(AtaAttribute attribute)
+{
+    public AtaAttribute Attribute { get; } = attribute;
+
+    public string Id => Attribute.Id.ToString("X2", CultureInfo.InvariantCulture);
+
+    public string Name => Strings.Current.AttributeTitle(Attribute.Id);
+
+    public string Current => Format.Number(Attribute.Current);
+
+    public string Worst => Format.Number(Attribute.Worst);
+
+    public string Threshold => Attribute.Threshold is { } threshold ? Format.Number(threshold) : Strings.Current.NoValue;
+
+    public string Raw => Format.Number(Attribute.Raw);
+
+    public bool IsFailing => Attribute.Failing;
+
+    public string State => IsFailing ? Strings.Current.AttributeFailing : Strings.Current.AttributeOk;
 }
 
 public sealed class OccupantRow(ClusterOccupant occupant, long bytesPerCluster)
@@ -156,9 +246,9 @@ public sealed class OccupantRow(ClusterOccupant occupant, long bytesPerCluster)
 public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposable
 {
     public const int MaxFragmentRows = 500;
-    public const int TabFragments = 0;
-    public const int TabSummary = 1;
-    public const int TabInspector = 2;
+    public const int TabMap = 0;
+    public const int TabFragments = 1;
+    public const int TabSummary = 2;
     public const int NoCell = -1;
 
     private static readonly TimeSpan Tick = TimeSpan.FromSeconds(1);
@@ -168,22 +258,29 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     private readonly DispatcherQueueTimer _clock;
     private readonly DispatcherQueueTimer _mapClock;
     private readonly Lazy<DriveOptimizer> _optimizer = new(NiskalaHost.CreateDriveOptimizer);
-    private readonly Dictionary<char, DriveHealth> _health = [];
+    private readonly Lazy<DriveListLoader> _loader;
+    private readonly Lazy<MaintenanceScheduler> _scheduler = new(NiskalaHost.CreateMaintenanceScheduler);
     private CancellationTokenSource? _cancel;
+    private CancellationTokenSource? _probe;
     private int _run;
+    private int _listAsk;
     private bool _moving;
     private DriveMap? _liveMap;
     private long _shownVersion = -1;
     private DateTimeOffset _started;
     private bool _loaded;
-    private int _healthAsk;
     private int _inspectAsk;
     private (long Start, long End)? _inspected;
     private ClusterInspection? _inspection;
+    private ScheduleState _schedule = ScheduleState.Off;
+    private bool _scheduleLoaded;
+    private bool _scheduleSync;
+    private bool _guideCanApply;
 
     internal DriveOptimizerViewModel(UiServices services)
     {
         _services = services;
+        _loader = new Lazy<DriveListLoader>(() => new DriveListLoader(_optimizer.Value));
         _clock = services.Dispatcher.CreateTimer();
         _clock.Interval = Tick;
         _clock.Tick += (_, _) => Elapsed = Clock(DateTimeOffset.Now - _started);
@@ -204,17 +301,23 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
 
     public SummaryRowCollection Health { get; } = [];
 
+    public AttributeRowCollection Attributes { get; } = [];
+
     public StrategyRowCollection Strategies { get; } = [];
 
     public OccupantRowCollection Occupants { get; } = [];
 
     public TextList Modes => [S.ModeName(DefragMode.Quick), S.ModeName(DefragMode.Consolidate), S.ModeName(DefragMode.FullZone)];
 
+    public TextList Schedules => [S.ScheduleName(MaintenanceSchedule.Off), S.ScheduleName(MaintenanceSchedule.Weekly), S.ScheduleName(MaintenanceSchedule.Monthly), S.ScheduleName(MaintenanceSchedule.WhenIdle)];
+
     public StatusBanner Banner { get; } = new();
 
+    public bool CanSchedule { get; } = ScheduledMaintenance.CanSchedule(Environment.ProcessPath, ScheduledMaintenance.InstalledRoots());
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsHdd), nameof(IsSsd), nameof(ShowModes), nameof(PrimaryText), nameof(SelectedTitle), nameof(SelectedFacts), nameof(HasSelection), nameof(ShowSsdNote), nameof(CanPrimary), nameof(CanDefragCheckedNow))]
-    [NotifyCanExecuteChangedFor(nameof(AnalyzeCommand), nameof(OptimizeCommand), nameof(DefragCheckedCommand))]
+    [NotifyPropertyChangedFor(nameof(IsHdd), nameof(IsSsd), nameof(ShowModes), nameof(PrimaryText), nameof(SelectedTitle), nameof(SelectedFacts), nameof(HasSelection), nameof(ShowSsdNote), nameof(CanPrimary), nameof(CanDefragCheckedNow), nameof(CanAnalyzeNow), nameof(CanApplyGuideNow))]
+    [NotifyCanExecuteChangedFor(nameof(AnalyzeCommand), nameof(OptimizeCommand), nameof(DefragCheckedCommand), nameof(ApplyGuideCommand))]
     public partial DriveRow? Selected { get; set; }
 
     [ObservableProperty]
@@ -222,8 +325,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     public partial int ModeIndex { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanPrimary), nameof(CanDefragCheckedNow), nameof(CanQueueNow))]
-    [NotifyCanExecuteChangedFor(nameof(AnalyzeCommand), nameof(OptimizeCommand), nameof(DefragCheckedCommand), nameof(CancelCommand), nameof(RefreshCommand), nameof(AnalyzeQueueCommand), nameof(OptimizeQueueCommand))]
+    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(CanPrimary), nameof(CanDefragCheckedNow), nameof(CanQueueNow), nameof(CanAnalyzeNow), nameof(CanApplyGuideNow))]
+    [NotifyCanExecuteChangedFor(nameof(AnalyzeCommand), nameof(OptimizeCommand), nameof(DefragCheckedCommand), nameof(CancelCommand), nameof(RefreshCommand), nameof(AnalyzeQueueCommand), nameof(OptimizeQueueCommand), nameof(ApplyGuideCommand))]
     public partial bool IsRunning { get; set; }
 
     [ObservableProperty]
@@ -237,7 +340,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     public partial string Activity { get; set; } = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowFragments), nameof(ShowSummary), nameof(ShowInspector))]
+    [NotifyPropertyChangedFor(nameof(ShowMap), nameof(ShowFragments), nameof(ShowSummary))]
     public partial int Tab { get; set; }
 
     [ObservableProperty]
@@ -274,7 +377,26 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     public partial string GuideVerdict { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial bool GuideShowsTrim { get; set; }
+    [NotifyPropertyChangedFor(nameof(IsSpeedGoal), nameof(IsImpactGoal), nameof(IsReclaimGoal))]
+    public partial StrategyGoal GuideGoal { get; set; }
+
+    [ObservableProperty]
+    public partial bool GuideGoalsEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial string GuideMainTitle { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string GuideMainHint { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string GuideMainFit { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string GuideMainMode { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool GuideMainRecommended { get; set; }
 
     [ObservableProperty]
     public partial string HealthNote { get; set; } = string.Empty;
@@ -292,6 +414,16 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     [NotifyCanExecuteChangedFor(nameof(ClearInspectionCommand))]
     public partial bool HasInspection { get; set; }
 
+    [ObservableProperty]
+    public partial int ScheduleIndex { get; set; }
+
+    [ObservableProperty]
+    public partial string ScheduleNote { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanChangeSchedule))]
+    public partial bool IsScheduleBusy { get; set; }
+
     public string AnalyzeText => AnalyzeLabel(S, IsAnalyzed);
 
     public bool IsIdle => !IsRunning;
@@ -301,6 +433,12 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     public bool CanDefragCheckedNow => CanDefragChecked();
 
     public bool CanQueueNow => CanQueue();
+
+    public bool CanAnalyzeNow => CanAnalyze();
+
+    public bool CanApplyGuideNow => CanApplyGuide();
+
+    public bool CanChangeSchedule => CanSchedule && _scheduleLoaded && !IsScheduleBusy;
 
     public bool HasSelection => Selected is not null;
 
@@ -316,11 +454,35 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
 
     public bool ShowMapEmpty => !HasMap;
 
+    public bool ShowMap => Tab == TabMap;
+
     public bool ShowFragments => Tab == TabFragments;
 
     public bool ShowSummary => Tab == TabSummary;
 
-    public bool ShowInspector => Tab == TabInspector;
+    public bool IsSpeedGoal
+    {
+        get => GuideGoal == StrategyGoal.MaximumSpeed;
+        set => PickGoal(StrategyGoal.MaximumSpeed, value);
+    }
+
+    public bool IsImpactGoal
+    {
+        get => GuideGoal == StrategyGoal.LowImpact;
+        set => PickGoal(StrategyGoal.LowImpact, value);
+    }
+
+    public bool IsReclaimGoal
+    {
+        get => GuideGoal == StrategyGoal.ReclaimSpace;
+        set => PickGoal(StrategyGoal.ReclaimSpace, value);
+    }
+
+    public string SpeedGoalName => S.GoalName(StrategyGoal.MaximumSpeed);
+
+    public string ImpactGoalName => S.GoalName(StrategyGoal.LowImpact);
+
+    public string ReclaimGoalName => S.GoalName(StrategyGoal.ReclaimSpace);
 
     public DefragMode Mode => (DefragMode)Math.Clamp(ModeIndex, (int)DefragMode.Quick, (int)DefragMode.FullZone);
 
@@ -340,6 +502,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
 
     public bool QueueMovesClusters => Drives.Any(d => d.IsQueued && d.Volume.CanRelocate);
 
+    public bool GuideMovesClusters => Selected?.Volume.CanRelocate == true;
+
     public static string PrimaryLabel(Strings strings, DriveVolume? volume)
     {
         ArgumentNullException.ThrowIfNull(strings);
@@ -355,6 +519,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     public static string FormatPercent(double percent) =>
         string.Create(CultureInfo.InvariantCulture, $"{(int)Math.Floor(Math.Clamp(double.IsNaN(percent) ? 0 : percent, 0, 100))}%");
 
+    public static int TabFor(bool isHdd, int current) => current == TabFragments && !isHdd ? TabMap : current;
+
     public ClusterState[] Summarize(int cells) => CurrentMap is { } map && cells > 0 ? map.Summarize(cells) : [];
 
     public int HighlightCell(int cells) => !IsRunning && _inspected is { } range && CurrentAnalysis?.Map is { } map && cells > 0 ? map.CellOf(range.Start, cells) : NoCell;
@@ -363,7 +529,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     {
         if (!_loaded)
         {
-            Refresh();
+            _ = LoadAsync(forgetHealth: false);
+            _ = LoadScheduleAsync();
         }
     }
 
@@ -375,11 +542,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         }
 
         ShowAnalysis();
-        if (Selected is { } selected && _health.TryGetValue(selected.Volume.Letter, out DriveHealth? health))
-        {
-            ShowHealth(selected.Volume, health);
-        }
-
+        ShowSelectedHealth();
         if (_inspection is { } inspection && Selected is { } current)
         {
             ShowInspection(current.Volume, inspection);
@@ -389,7 +552,10 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
             InspectorNote = S.InspectorEmpty;
         }
 
+        _scheduleSync = true;
         OnPropertyChanged(string.Empty);
+        _scheduleSync = false;
+        ShowSchedule(_schedule);
     }
 
     public void Dispose()
@@ -397,6 +563,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         _clock.Stop();
         _mapClock.Stop();
         TaskViewModel.Stop(_cancel);
+        TaskViewModel.Stop(_probe);
+        _probe?.Dispose();
     }
 
     private DriveMap? CurrentMap => IsRunning && _liveMap is not null ? _liveMap : CurrentAnalysis?.Map;
@@ -404,9 +572,6 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     private DriveAnalysis? CurrentAnalysis => Selected is { } row ? Cached(row.Volume) : null;
 
     private DriveAnalysis? Cached(DriveVolume volume) => _optimizer.Value.Cached(volume);
-
-    public static int TabFor(bool wasHdd, bool isHdd, int current) =>
-        current == TabInspector ? (isHdd ? TabFragments : TabSummary) : !isHdd ? TabSummary : wasHdd ? current : TabFragments;
 
     partial void OnSelectedChanged(DriveRow? oldValue, DriveRow? newValue)
     {
@@ -418,27 +583,53 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         }
 
         ResetInspection();
-        Tab = TabFor(oldValue?.IsHdd == true, newValue?.IsHdd == true, Tab);
-        ShowAnalysis();
-        _ = LoadHealthAsync(newValue);
+        Tab = TabFor(newValue?.IsHdd == true, Tab);
+        ShowAnalysis(resetGoal: true);
+        ShowSelectedHealth();
     }
 
-    partial void OnModeIndexChanged(int value) => ShowGuide();
+    partial void OnModeIndexChanged(int value)
+    {
+        GuideGoal = StrategyGuide.GoalFor(Mode);
+        ShowGuide(resetGoal: false);
+    }
 
-    partial void OnIsGuideOpenChanged(bool value) => ShowGuide();
+    partial void OnIsGuideOpenChanged(bool value) => ShowGuide(resetGoal: true);
+
+    partial void OnScheduleIndexChanged(int value)
+    {
+        if (_scheduleSync || !_scheduleLoaded || value < 0 || (MaintenanceSchedule)value == _schedule.Schedule)
+        {
+            return;
+        }
+
+        _ = ApplyScheduleAsync((MaintenanceSchedule)Math.Clamp(value, (int)MaintenanceSchedule.Off, (int)MaintenanceSchedule.WhenIdle));
+    }
 
     private bool CanRefresh() => !IsRunning;
 
     [RelayCommand(CanExecute = nameof(CanRefresh))]
-    private void Refresh()
+    private Task RefreshAsync() => LoadAsync(forgetHealth: true);
+
+    private async Task LoadAsync(bool forgetHealth)
     {
         _loaded = true;
+        int ask = ++_listAsk;
+        TaskViewModel.Stop(_probe);
+        _probe?.Dispose();
+        var probe = new CancellationTokenSource();
+        _probe = probe;
+        if (forgetHealth)
+        {
+            _optimizer.Value.Media.ForgetHealth();
+        }
+
         char? keep = Selected?.Volume.Letter;
         HashSet<char> queued = [.. Drives.Where(d => d.IsQueued).Select(d => d.Volume.Letter)];
         IReadOnlyList<DriveVolume> volumes;
         try
         {
-            volumes = _optimizer.Value.Volumes();
+            volumes = await Task.Run(_loader.Value.Shell);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -446,15 +637,19 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
             return;
         }
 
-        _health.Clear();
+        if (ask != _listAsk)
+        {
+            return;
+        }
+
         Drives.Clear();
         foreach (DriveVolume volume in volumes)
         {
             var row = new DriveRow(volume, CountQueued) { IsQueued = queued.Contains(volume.Letter) };
-            if (Cached(volume) is { } analysis)
+            row.Show(Cached(volume));
+            if (_optimizer.Value.Media.TryGetHealth(volume, out DriveHealth health))
             {
-                row.FragmentedPercent = analysis.Summary().FragmentedPercent;
-                row.Relabel();
+                row.SetHealth(health);
             }
 
             Drives.Add(row);
@@ -466,9 +661,72 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         {
             Banner.Show(InfoBarSeverity.Informational, S.NoDrives);
         }
+
+        _ = ProbeAsync(volumes, ask, probe.Token);
     }
 
-    private bool CanAnalyze() => !IsRunning && Selected is not null;
+    private async Task ProbeAsync(IReadOnlyList<DriveVolume> volumes, int ask, CancellationToken token)
+    {
+        try
+        {
+            await _loader.Value.ProbeAllAsync(volumes, update => _services.Post(() => ApplyProbe(ask, update)), token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void ApplyProbe(int ask, DriveProbeUpdate update)
+    {
+        if (ask != _listAsk || Drives.FirstOrDefault(d => d.Volume.Letter == update.Volume.Letter) is not { } row)
+        {
+            return;
+        }
+
+        switch (update.Stage)
+        {
+            case ProbeStage.Slow:
+                row.SetProbe(ProbeState.Waiting);
+                break;
+            case ProbeStage.Failed:
+                row.SetProbe(ProbeState.Failed);
+                break;
+            case ProbeStage.Media:
+                row.Update(update.Volume);
+                break;
+            case ProbeStage.Health when update.Health is { } health:
+                row.SetHealth(health);
+                break;
+        }
+
+        if (ReferenceEquals(row, Selected))
+        {
+            SelectionUpdated();
+        }
+    }
+
+    private void SelectionUpdated()
+    {
+        foreach (string name in (string[])[nameof(IsHdd), nameof(IsSsd), nameof(ShowModes), nameof(PrimaryText), nameof(SelectedTitle), nameof(SelectedFacts), nameof(ShowSsdNote), nameof(CanPrimary), nameof(CanDefragCheckedNow), nameof(CanAnalyzeNow), nameof(CanApplyGuideNow)])
+        {
+            OnPropertyChanged(name);
+        }
+
+        AnalyzeCommand.NotifyCanExecuteChanged();
+        OptimizeCommand.NotifyCanExecuteChanged();
+        DefragCheckedCommand.NotifyCanExecuteChanged();
+        ApplyGuideCommand.NotifyCanExecuteChanged();
+        Tab = TabFor(IsHdd, Tab);
+        if (!IsRunning)
+        {
+            FragmentsNote = CurrentAnalysis is null && IsHdd ? S.FragmentsIdle : FragmentsNote;
+        }
+
+        ShowGuide(resetGoal: true);
+        ShowSelectedHealth();
+    }
+
+    private bool CanAnalyze() => !IsRunning && Selected is { CanAnalyze: true };
 
     [RelayCommand(CanExecute = nameof(CanAnalyze))]
     private Task AnalyzeAsync() => Selected is { } row ? RunAsync(row, async token =>
@@ -500,6 +758,25 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
     [RelayCommand(CanExecute = nameof(CanQueue))]
     private Task OptimizeQueueAsync() => RunQueueAsync(QueueKind.Optimize);
 
+    private bool CanApplyGuide() => !IsRunning && _guideCanApply && Selected is { } row && (row.IsSsd ? row.Volume.TrimSupported : row.Volume.CanRelocate);
+
+    [RelayCommand(CanExecute = nameof(CanApplyGuide))]
+    private Task ApplyGuideAsync()
+    {
+        if (Selected is not { } row)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (row.IsSsd)
+        {
+            return TrimAsync(row);
+        }
+
+        ApplyStrategy(GuideGoal);
+        return DefragmentAsync(row, Mode, null);
+    }
+
     [RelayCommand(CanExecute = nameof(IsRunning))]
     private void Cancel()
     {
@@ -516,6 +793,9 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         ResetInspection();
         RefreshMap(force: true);
     }
+
+    [RelayCommand]
+    private void CloseGuide() => IsGuideOpen = false;
 
     private void ShowStopping()
     {
@@ -540,7 +820,18 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         }
 
         ModeIndex = (int)StrategyGuide.ModeFor(goal);
-        Banner.Show(InfoBarSeverity.Informational, S.GuideApplied(goal));
+        GuideGoal = goal;
+    }
+
+    public void ChooseGoal(StrategyGoal goal)
+    {
+        if (IsRunning)
+        {
+            return;
+        }
+
+        GuideGoal = goal;
+        ShowGuide(resetGoal: false);
     }
 
     public async Task InspectAsync(int cell, int cells)
@@ -559,13 +850,25 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         InspectorDetail = string.Empty;
         InspectorNote = S.InspectorBusy;
         HasInspection = true;
-        Tab = TabInspector;
+        Tab = TabMap;
         RefreshMap(force: true);
         ClusterInspection inspection = await Task.Run(() => ClusterInspector.Inspect(analysis, start, end));
         if (ask == _inspectAsk && ReferenceEquals(CurrentAnalysis, analysis))
         {
             ShowInspection(analysis.Volume, inspection);
         }
+    }
+
+    private void PickGoal(StrategyGoal goal, bool picked)
+    {
+        if (picked && GuideGoalsEnabled)
+        {
+            ChooseGoal(goal);
+        }
+
+        OnPropertyChanged(nameof(IsSpeedGoal));
+        OnPropertyChanged(nameof(IsImpactGoal));
+        OnPropertyChanged(nameof(IsReclaimGoal));
     }
 
     private Task DefragmentAsync(DriveRow row, DefragMode mode, IReadOnlyCollection<string>? only) => RunAsync(row, async token =>
@@ -575,8 +878,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         Percent = 0;
         _moving = true;
         DefragResult result = await _optimizer.Value.DefragmentAsync(analysis, mode, only, new Sink(this), token);
-        row.FragmentedPercent = analysis.Summary().FragmentedPercent;
         UpdateVolume(row);
+        row.Show(Cached(row.Volume));
         ShowAnalysis();
         string moved = Format.Bytes(result.ClustersMoved * Math.Max(1, row.Volume.BytesPerCluster));
         InfoBarSeverity severity = result.Cancelled || result.Failed > 0 ? InfoBarSeverity.Warning : InfoBarSeverity.Success;
@@ -616,17 +919,12 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
                     continue;
                 }
 
-                if (Cached(row.Volume) is { } analysis)
-                {
-                    row.FragmentedPercent = analysis.Summary().FragmentedPercent;
-                }
-
                 if (result.Defrag is not null || result.Trim is not null)
                 {
                     UpdateVolume(row);
                 }
 
-                row.Relabel();
+                row.Show(Cached(row.Volume));
             }
 
             ShowAnalysis();
@@ -643,9 +941,8 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         HasMap = false;
         MapChanged?.Invoke();
         DriveAnalysis analysis = await _optimizer.Value.AnalyzeAsync(row.Volume, new Sink(this), token);
-        row.FragmentedPercent = analysis.Summary().FragmentedPercent;
-        row.Relabel();
-        ShowAnalysis();
+        row.Show(analysis);
+        ShowAnalysis(resetGoal: true);
         return analysis;
     }
 
@@ -666,6 +963,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         _started = DateTimeOffset.Now;
         Elapsed = Clock(TimeSpan.Zero);
         IsRunning = true;
+        row.IsBusy = true;
         _clock.Start();
         _mapClock.Start();
         try
@@ -701,22 +999,28 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
             _moving = false;
             IsStopping = false;
             Activity = string.Empty;
+            foreach (DriveRow busy in Drives.Where(d => d.IsBusy))
+            {
+                busy.IsBusy = false;
+            }
+
+            row.IsBusy = false;
             IsRunning = false;
             RefreshMap(force: true);
-            ShowGuide();
+            ShowGuide(resetGoal: false);
         }
     }
 
     private void UpdateVolume(DriveRow row)
     {
-        if (_optimizer.Value.Volumes().FirstOrDefault(v => v.Letter == row.Volume.Letter) is { } fresh)
+        if (_optimizer.Value.ListVolumes().FirstOrDefault(v => v.Letter == row.Volume.Letter) is { } fresh)
         {
-            row.Update(fresh);
+            row.Update(fresh.Probed ? fresh : fresh with { Media = row.Volume.Media, TrimSupported = row.Volume.TrimSupported, Bus = row.Volume.Bus, RotationRate = row.Volume.RotationRate, Probed = row.Volume.Probed });
             OnPropertyChanged(nameof(SelectedFacts));
         }
     }
 
-    private void ShowAnalysis()
+    private void ShowAnalysis(bool resetGoal = false)
     {
         Fragments.Clear();
         Summary.Clear();
@@ -724,7 +1028,7 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         DriveAnalysis? analysis = CurrentAnalysis;
         IsAnalyzed = analysis is not null;
         HasMap = CurrentMap is not null;
-        ShowGuide();
+        ShowGuide(resetGoal);
         if (analysis is null)
         {
             FragmentTitle = string.Empty;
@@ -761,66 +1065,100 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
             new(strings.SummaryMedia, strings.MediaFacts(volume)),
             new(strings.SummaryClusters, strings.ClusterCount(summary.TotalClusters, Format.Bytes(cluster))),
             new(strings.SummaryFree, strings.FreeShare(Format.Bytes(summary.FreeClusters * cluster), free)),
+            new(strings.SummaryFreeFragments, Format.Number(summary.FreeFragments)),
             new(strings.SummaryFragmentedFiles, Format.Number(summary.FragmentedFiles)),
             new(strings.SummaryExcess, Format.Number(summary.ExcessFragments)),
             new(strings.SummaryShare, Format.Percent(summary.FragmentedPercent)),
+            new(strings.ColumnAssessment, strings.AssessmentName(DriveAssessor.Assess(summary))),
             new(strings.SummaryLargestFree, Format.Bytes(summary.LargestFreeClusters * cluster)),
+            new(strings.SummaryCompressed, Format.Number(summary.CompressedFiles)),
+            new(strings.SummaryReserved, Format.Bytes(summary.ReservedClusters * cluster)),
             new(strings.SummaryZones, strings.ZoneSpread(summary.FastFiles, summary.StandardFiles, summary.ArchiveFiles)),
             new(strings.SummarySkipped, strings.SkippedCounts(summary.Protected, summary.Locked, summary.Inaccessible)),
             new(strings.SummaryAnalyzed, Format.When(analyzedAt)),
         ];
     }
 
-    private void ShowGuide()
+    private void ShowGuide(bool resetGoal)
     {
         Strategies.Clear();
         if (!IsGuideOpen || Selected is not { } row)
         {
             GuideVerdict = string.Empty;
-            GuideShowsTrim = false;
+            GuideMainTitle = string.Empty;
+            GuideMainHint = string.Empty;
+            GuideMainFit = string.Empty;
+            GuideMainMode = string.Empty;
+            GuideMainRecommended = false;
+            GuideGoalsEnabled = false;
+            SetGuideApply(false);
             return;
         }
 
         DriveSummary? summary = CurrentAnalysis?.Summary();
         StrategyAdvice advice = StrategyGuide.Advise(row.Volume, summary);
         GuideVerdict = S.GuideVerdict(advice, row.Volume, summary);
-        GuideShowsTrim = advice.UsesTrim;
-        foreach (StrategyOption option in advice.Options)
+        if (advice.UsesTrim)
         {
-            Strategies.Add(new StrategyRow(option, option.CanApply && option.Mode == Mode, ApplyStrategy));
+            GuideGoalsEnabled = false;
+            GuideMainTitle = S.DriveTrim;
+            GuideMainHint = S.GuideTrimHint;
+            GuideMainFit = S.FitName(StrategyFit.Recommended);
+            GuideMainMode = string.Empty;
+            GuideMainRecommended = true;
+            foreach (StrategyOption option in advice.Options)
+            {
+                Strategies.Add(new StrategyRow(option, ChooseGoal));
+            }
+
+            SetGuideApply(row.Volume.TrimSupported);
+            return;
         }
+
+        if (resetGoal)
+        {
+            GuideGoal = advice.Recommended ?? StrategyGuide.GoalFor(Mode);
+        }
+
+        StrategyOption main = advice.Option(GuideGoal);
+        GuideGoalsEnabled = advice.AllowsRelocation;
+        GuideMainTitle = S.GoalName(main.Goal);
+        GuideMainHint = main.CanApply ? S.GoalHint(main.Goal) : S.GuideNoAction;
+        GuideMainFit = S.FitName(main.Fit);
+        GuideMainMode = main.CanApply ? S.ModeName(main.Mode) : string.Empty;
+        GuideMainRecommended = main.Fit == StrategyFit.Recommended;
+        foreach (StrategyOption option in advice.Options.Where(o => o.Goal != main.Goal))
+        {
+            Strategies.Add(new StrategyRow(option, ChooseGoal));
+        }
+
+        SetGuideApply(main.CanApply && row.Volume.CanRelocate);
     }
 
-    private async Task LoadHealthAsync(DriveRow? row)
+    private void SetGuideApply(bool value)
     {
-        int ask = ++_healthAsk;
+        _guideCanApply = value;
+        OnPropertyChanged(nameof(CanApplyGuideNow));
+        ApplyGuideCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ShowSelectedHealth()
+    {
         Health.Clear();
-        if (row is null)
+        Attributes.Clear();
+        if (Selected is not { } row)
         {
             HealthNote = string.Empty;
             return;
         }
 
-        if (!_health.TryGetValue(row.Volume.Letter, out DriveHealth? health))
+        if (row.Health is not { } health)
         {
-            HealthNote = S.HealthReading;
-            try
-            {
-                health = await _optimizer.Value.ReadHealthAsync(row.Volume, CancellationToken.None);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
-            {
-                UiLog.TaskFailed(_services.Host.LoggerFactory.CreateLogger<DriveOptimizerViewModel>(), ex);
-                health = DriveHealth.Unavailable(row.Volume);
-            }
-
-            _health[row.Volume.Letter] = health;
+            HealthNote = row.Probe == ProbeState.Failed ? S.HealthUnavailable(row.Volume.Bus is StorageBus.Usb or StorageBus.Ieee1394) : S.HealthReading;
+            return;
         }
 
-        if (ask == _healthAsk)
-        {
-            ShowHealth(row.Volume, health);
-        }
+        ShowHealth(row.Volume, health);
     }
 
     private void ShowHealth(DriveVolume volume, DriveHealth health)
@@ -829,6 +1167,12 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         foreach (SummaryRow row in HealthRows(S, volume, health))
         {
             Health.Add(row);
+        }
+
+        Attributes.Clear();
+        foreach (AtaAttribute attribute in health.Table)
+        {
+            Attributes.Add(new AttributeRow(attribute));
         }
 
         HealthNote = health.HasData ? string.Empty : S.HealthUnavailable(health.Bridged);
@@ -870,8 +1214,34 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
             rows.Add(new(strings.HealthSpare, Format.Percent(spare)));
         }
 
+        if (health.ReallocatedSectors is not null || health.PendingSectors is not null || health.UncorrectableSectors is not null)
+        {
+            rows.Add(new(strings.HealthSectors, strings.SectorCounts(health)));
+        }
+
+        if (health.Counters is { } counters)
+        {
+            rows.Add(new(strings.HealthDataRead, Format.Bytes(Scaled(counters.DataUnitsRead))));
+            rows.Add(new(strings.HealthDataWritten, Format.Bytes(Scaled(counters.DataUnitsWritten))));
+            rows.Add(new(strings.HealthPowerCycles, Format.Number(counters.PowerCycles)));
+            rows.Add(new(strings.HealthUnsafeShutdowns, Format.Number(counters.UnsafeShutdowns)));
+            rows.Add(new(strings.HealthMediaErrors, Format.Number(counters.MediaErrors)));
+        }
+
+        if (health.Protocol != HealthProtocol.Unknown || health.Bridged)
+        {
+            rows.Add(new(strings.HealthInterface, strings.InterfaceText(health)));
+        }
+
+        if (health.Model is { Length: > 0 } model)
+        {
+            rows.Add(new(strings.HealthModel, model));
+        }
+
         rows.Add(new(strings.HealthSourceLabel, strings.HealthSourceName(health.Source)));
         return rows;
+
+        static long Scaled(long units) => units > long.MaxValue / NvmeCounters.BytesPerDataUnit ? long.MaxValue : units * NvmeCounters.BytesPerDataUnit;
     }
 
     private void ShowInspection(DriveVolume volume, ClusterInspection inspection)
@@ -884,15 +1254,21 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         }
 
         InspectorTitle = S.InspectorTitle(inspection, volume.BytesPerCluster);
+        long cluster = Math.Max(1, volume.BytesPerCluster);
         var details = new List<string>();
         if (inspection.Files.Count < inspection.TotalFiles)
         {
             details.Add(S.InspectorMore(inspection.Files.Count, inspection.TotalFiles));
         }
 
+        if (inspection.ReservedClusters > 0)
+        {
+            details.Add(S.InspectorReserved(inspection.ReservedClusters * cluster));
+        }
+
         if (inspection.UnlistedClusters > 0)
         {
-            details.Add(S.InspectorUnlisted(inspection.UnlistedClusters * Math.Max(1, volume.BytesPerCluster)));
+            details.Add(S.InspectorUnlisted(inspection.UnlistedClusters * cluster));
         }
 
         InspectorDetail = string.Join(" ", details);
@@ -909,6 +1285,44 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
         InspectorDetail = string.Empty;
         InspectorNote = S.InspectorEmpty;
         HasInspection = false;
+    }
+
+    private async Task LoadScheduleAsync()
+    {
+        IsScheduleBusy = true;
+        ScheduleNote = S.ScheduleReading;
+        ScheduleState state = await Task.Run(_scheduler.Value.Read);
+        _scheduleLoaded = true;
+        ShowSchedule(state);
+        IsScheduleBusy = false;
+    }
+
+    private async Task ApplyScheduleAsync(MaintenanceSchedule schedule)
+    {
+        if (!CanChangeSchedule || Environment.ProcessPath is not { } program)
+        {
+            ShowSchedule(_schedule);
+            return;
+        }
+
+        IsScheduleBusy = true;
+        ScheduleState state = await Task.Run(() => _scheduler.Value.Apply(schedule, program));
+        ShowSchedule(state);
+        IsScheduleBusy = false;
+    }
+
+    private void ShowSchedule(ScheduleState state)
+    {
+        _schedule = state;
+        _scheduleSync = true;
+        ScheduleIndex = (int)state.Schedule;
+        _scheduleSync = false;
+        if (_scheduleLoaded)
+        {
+            ScheduleNote = CanSchedule ? S.ScheduleNote(state) : $"{S.ScheduleNote(state)} {S.ScheduleNeedsInstall}";
+        }
+
+        OnPropertyChanged(nameof(CanChangeSchedule));
     }
 
     private void RefreshMap(bool force)
@@ -965,10 +1379,19 @@ public sealed partial class DriveOptimizerViewModel : ObservableObject, IDisposa
             return;
         }
 
-        if (Selected?.Volume.Letter != progress.Step.Volume.Letter && Drives.FirstOrDefault(d => d.Volume.Letter == progress.Step.Volume.Letter) is { } row)
+        if (Drives.FirstOrDefault(d => d.Volume.Letter == progress.Step.Volume.Letter) is { } row)
         {
-            _liveMap = null;
-            Selected = row;
+            foreach (DriveRow other in Drives.Where(d => d.IsBusy && !ReferenceEquals(d, row)))
+            {
+                other.IsBusy = false;
+            }
+
+            row.IsBusy = true;
+            if (!ReferenceEquals(Selected, row))
+            {
+                _liveMap = null;
+                Selected = row;
+            }
         }
 
         Apply(run, progress.Drive);

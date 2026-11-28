@@ -13,6 +13,15 @@
       <Setter Property="CornerRadius" Value="2" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+    <Style x:Key="ColumnHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionMutedStyle}">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="CellTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}">
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
     <DataTemplate x:Key="SummaryRowTemplate" x:DataType="vm:SummaryRow">
       <Grid ColumnSpacing="14" Padding="2,6" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,0,0,1">
         <Grid.ColumnDefinitions>
@@ -25,23 +34,32 @@
     </DataTemplate>
   </UserControl.Resources>
 
-  <Grid Padding="28,4,28,20" RowSpacing="14">
+  <Grid Padding="28,4,28,20" RowSpacing="12">
     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <Grid ColumnSpacing="12">
+    <Grid ColumnSpacing="12" RowSpacing="6">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <StackPanel>
         <TextBlock Text="{x:Bind ViewModel.S.DrivesTitle}" Style="{StaticResource PageTitleStyle}" />
         <TextBlock Text="{x:Bind ViewModel.S.DrivesSubtitle}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
       </StackPanel>
-      <Button Grid.Column="1" VerticalAlignment="Top" Command="{x:Bind ViewModel.RefreshCommand}" ToolTipService.ToolTip="{x:Bind ViewModel.S.Refresh}"
+      <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Top" MaxWidth="340">
+        <ComboBox x:Name="ScheduleBox" Header="{x:Bind ViewModel.S.ScheduleLabel}" ItemsSource="{x:Bind ViewModel.Schedules, Mode=OneWay}" SelectedIndex="{x:Bind ViewModel.ScheduleIndex, Mode=TwoWay}"
+                  MinWidth="200" HorizontalAlignment="Stretch" IsEnabled="{x:Bind ViewModel.CanChangeSchedule, Mode=OneWay}" AutomationProperties.Name="{x:Bind ViewModel.S.ScheduleLabel}" />
+        <TextBlock Text="{x:Bind ViewModel.ScheduleNote, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
+                   Visibility="{x:Bind services:Format.VisibleText(ViewModel.ScheduleNote), Mode=OneWay}" />
+      </StackPanel>
+      <Button Grid.Column="2" VerticalAlignment="Top" Command="{x:Bind ViewModel.RefreshCommand}" ToolTipService.ToolTip="{x:Bind ViewModel.S.Refresh}"
               AutomationProperties.Name="{x:Bind ViewModel.S.Refresh}">
         <FontIcon Glyph="&#xE72C;" FontSize="14" />
       </Button>
@@ -51,316 +69,272 @@
              Severity="{x:Bind ViewModel.Banner.Severity, Mode=OneWay}" Message="{x:Bind ViewModel.Banner.Message, Mode=OneWay}"
              IsOpen="{x:Bind ViewModel.Banner.IsOpen, Mode=OneWay}" Visibility="{x:Bind services:Format.VisibleText(ViewModel.Banner.Message), Mode=OneWay}" />
 
-    <Grid Grid.Row="2" ColumnSpacing="14">
+    <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="4">
+      <Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Auto" VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
+          <Grid MinWidth="1040" RowSpacing="2">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid ColumnSpacing="10" Padding="12,6,12,6" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,0,0,1">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="3*" />
+              </Grid.ColumnDefinitions>
+              <Border Width="20" />
+              <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.S.ColumnDrive}" Style="{StaticResource ColumnHeaderStyle}" />
+              <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.S.ColumnStatus}" Style="{StaticResource ColumnHeaderStyle}" />
+              <TextBlock Grid.Column="3" Text="{x:Bind ViewModel.S.ColumnLastAnalysis}" Style="{StaticResource ColumnHeaderStyle}" />
+              <TextBlock Grid.Column="4" Text="{x:Bind ViewModel.S.ColumnFiles}" Style="{StaticResource ColumnHeaderStyle}" TextAlignment="Right" />
+              <TextBlock Grid.Column="5" Text="{x:Bind ViewModel.S.ColumnFragmentedFiles}" Style="{StaticResource ColumnHeaderStyle}" TextAlignment="Right" />
+              <TextBlock Grid.Column="6" Text="{x:Bind ViewModel.S.ColumnFreeFragments}" Style="{StaticResource ColumnHeaderStyle}" TextAlignment="Right" />
+              <TextBlock Grid.Column="7" Text="{x:Bind ViewModel.S.ColumnFragmentation}" Style="{StaticResource ColumnHeaderStyle}" TextAlignment="Right" />
+              <TextBlock Grid.Column="8" Text="{x:Bind ViewModel.S.ColumnAssessment}" Style="{StaticResource ColumnHeaderStyle}" />
+              <TextBlock Grid.Column="9" Text="{x:Bind ViewModel.S.ColumnMedia}" Style="{StaticResource ColumnHeaderStyle}" />
+              <TextBlock Grid.Column="10" Text="{x:Bind ViewModel.S.ColumnFileSystem}" Style="{StaticResource ColumnHeaderStyle}" />
+              <TextBlock Grid.Column="11" Text="{x:Bind ViewModel.S.ColumnCapacity}" Style="{StaticResource ColumnHeaderStyle}" />
+            </Grid>
+            <ListView x:Name="DriveList" Grid.Row="1" ItemsSource="{x:Bind ViewModel.Drives}" SelectedItem="{x:Bind ViewModel.Selected, Mode=TwoWay}" SelectionMode="Single"
+                      MaxHeight="230" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" AutomationProperties.Name="{x:Bind ViewModel.S.DrivesTitle}">
+              <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                  <Setter Property="MinHeight" Value="40" />
+                  <Setter Property="Padding" Value="12,0" />
+                  <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+              </ListView.ItemContainerStyle>
+              <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:DriveRow">
+                  <Grid ColumnSpacing="10" Padding="0,6">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="3*" />
+                      <ColumnDefinition Width="2*" />
+                      <ColumnDefinition Width="2*" />
+                      <ColumnDefinition Width="1*" />
+                      <ColumnDefinition Width="1*" />
+                      <ColumnDefinition Width="1*" />
+                      <ColumnDefinition Width="1*" />
+                      <ColumnDefinition Width="2*" />
+                      <ColumnDefinition Width="1*" />
+                      <ColumnDefinition Width="1*" />
+                      <ColumnDefinition Width="3*" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox MinWidth="0" Width="20" VerticalAlignment="Center" IsChecked="{x:Bind IsQueued, Mode=TwoWay}" AutomationProperties.Name="{x:Bind QueueName, Mode=OneWay}"
+                              ToolTipService.ToolTip="{x:Bind QueueName, Mode=OneWay}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <FontIcon Glyph="&#xEDA2;" FontSize="14" Foreground="{ThemeResource NiskalaMutedBrush}" />
+                      <TextBlock Text="{x:Bind Name, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
+                      <TextBlock Text="{x:Bind Label, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <ProgressRing Width="12" Height="12" IsActive="{x:Bind IsDetecting, Mode=OneWay}" Visibility="{x:Bind services:Format.Visible(IsDetecting), Mode=OneWay}" />
+                      <FontIcon Glyph="&#xE7BA;" FontSize="12" Foreground="{ThemeResource NiskalaWarningBrush}" Visibility="{x:Bind services:Format.Visible(HasWarning), Mode=OneWay}" />
+                      <TextBlock Text="{x:Bind Status, Mode=OneWay}" Style="{StaticResource CellTextStyle}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="3" Text="{x:Bind LastAnalysis, Mode=OneWay}" Style="{StaticResource CellTextStyle}" />
+                    <TextBlock Grid.Column="4" Text="{x:Bind TotalFiles, Mode=OneWay}" Style="{StaticResource CellTextStyle}" TextAlignment="Right" />
+                    <TextBlock Grid.Column="5" Text="{x:Bind FragmentedFiles, Mode=OneWay}" Style="{StaticResource CellTextStyle}" TextAlignment="Right" />
+                    <TextBlock Grid.Column="6" Text="{x:Bind FreeFragments, Mode=OneWay}" Style="{StaticResource CellTextStyle}" TextAlignment="Right" />
+                    <TextBlock Grid.Column="7" Text="{x:Bind Fragmentation, Mode=OneWay}" Style="{StaticResource CellTextStyle}" TextAlignment="Right" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="8" Text="{x:Bind Assessment, Mode=OneWay}" Style="{StaticResource CellTextStyle}" />
+                    <Border Grid.Column="9" Style="{StaticResource PillStyle}" Background="{ThemeResource NiskalaAccentSoftBrush}" BorderThickness="0" HorizontalAlignment="Left" VerticalAlignment="Center">
+                      <TextBlock Text="{x:Bind Media, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" FontWeight="SemiBold" />
+                    </Border>
+                    <TextBlock Grid.Column="10" Text="{x:Bind FileSystem, Mode=OneWay}" Style="{StaticResource CellTextStyle}" />
+                    <StackPanel Grid.Column="11" Spacing="3" VerticalAlignment="Center">
+                      <ProgressBar Minimum="0" Maximum="100" Value="{x:Bind UsedPercent, Mode=OneWay}" IsIndeterminate="False" />
+                      <TextBlock Text="{x:Bind Capacity, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ListView.ItemTemplate>
+            </ListView>
+          </Grid>
+        </ScrollViewer>
+        <TextBlock Text="{x:Bind ViewModel.S.NoDrives}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,48,0,16"
+                   Visibility="{x:Bind services:Format.Empty(ViewModel.Drives.Count), Mode=OneWay}" />
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="3" Style="{StaticResource CardStyle}">
+      <Grid ColumnSpacing="8" RowSpacing="8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel Spacing="2" VerticalAlignment="Center">
+          <TextBlock Text="{x:Bind ViewModel.SelectedTitle, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="16" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{x:Bind ViewModel.SelectedFacts, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <Button Grid.Column="1" Command="{x:Bind ViewModel.AnalyzeCommand}" AutomationProperties.Name="{x:Bind ViewModel.AnalyzeText, Mode=OneWay}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <FontIcon Glyph="&#xE9D9;" FontSize="13" />
+            <TextBlock Text="{x:Bind ViewModel.AnalyzeText, Mode=OneWay}" />
+          </StackPanel>
+        </Button>
+        <ToggleButton Grid.Column="2" IsChecked="{x:Bind ViewModel.IsGuideOpen, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.HasSelection, Mode=OneWay}"
+                      AutomationProperties.Name="{x:Bind ViewModel.S.GuideButton}" ToolTipService.ToolTip="{x:Bind ViewModel.S.GuideTitle}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <FontIcon Glyph="&#xE82F;" FontSize="13" />
+            <TextBlock Text="{x:Bind ViewModel.S.GuideButton}" />
+          </StackPanel>
+        </ToggleButton>
+        <ComboBox Grid.Column="3" ItemsSource="{x:Bind ViewModel.Modes}" SelectedIndex="{x:Bind ViewModel.ModeIndex, Mode=TwoWay}"
+                  MinWidth="160" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" AutomationProperties.Name="{x:Bind ViewModel.S.DriveModeLabel}"
+                  Visibility="{x:Bind services:Format.Visible(ViewModel.ShowModes), Mode=OneWay}" />
+        <Button x:Name="PrimaryButton" Grid.Column="4" Style="{StaticResource AccentButtonStyle}" Click="OnPrimary" IsEnabled="{x:Bind ViewModel.CanPrimary, Mode=OneWay}"
+                AutomationProperties.Name="{x:Bind ViewModel.PrimaryText, Mode=OneWay}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <FontIcon Glyph="&#xE768;" FontSize="13" />
+            <TextBlock Text="{x:Bind ViewModel.PrimaryText, Mode=OneWay}" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="5" Content="{x:Bind ViewModel.S.Cancel}" Command="{x:Bind ViewModel.CancelCommand}" />
+
+        <Grid Grid.Row="1" Grid.ColumnSpan="6" ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <ProgressBar IsIndeterminate="False" Minimum="0" Maximum="100" Value="{x:Bind ViewModel.Percent, Mode=OneWay}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.PercentText, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" FontFamily="{StaticResource NiskalaMonoFont}"
+                     MinWidth="44" TextAlignment="Right" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Elapsed, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" FontFamily="{StaticResource NiskalaMonoFont}" VerticalAlignment="Center" />
+        </Grid>
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="6" Text="{x:Bind ViewModel.Activity, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis"
+                   Visibility="{x:Bind services:Format.VisibleText(ViewModel.Activity), Mode=OneWay}" />
+        <Grid Grid.Row="3" Grid.ColumnSpan="6" ColumnSpacing="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{x:Bind ViewModel.ModeHint, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
+                       Visibility="{x:Bind services:Format.Visible(ViewModel.ShowModes), Mode=OneWay}" />
+            <TextBlock Text="{x:Bind ViewModel.S.SsdNote}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
+                       Visibility="{x:Bind services:Format.Visible(ViewModel.ShowSsdNote), Mode=OneWay}" />
+            <TextBlock Text="{x:Bind ViewModel.S.QueueHint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
+                       Visibility="{x:Bind services:Format.Visible(ViewModel.HasQueue), Mode=OneWay}" />
+          </StackPanel>
+          <Button Grid.Column="1" Command="{x:Bind ViewModel.AnalyzeQueueCommand}" Content="{x:Bind ViewModel.QueueAnalyzeText, Mode=OneWay}"
+                  AutomationProperties.Name="{x:Bind ViewModel.QueueAnalyzeText, Mode=OneWay}" Visibility="{x:Bind services:Format.Visible(ViewModel.HasQueue), Mode=OneWay}" />
+          <Button x:Name="QueueButton" Grid.Column="2" Style="{StaticResource AccentButtonStyle}" Click="OnOptimizeQueue"
+                  IsEnabled="{x:Bind ViewModel.CanQueueNow, Mode=OneWay}" Content="{x:Bind ViewModel.QueueOptimizeText, Mode=OneWay}"
+                  AutomationProperties.Name="{x:Bind ViewModel.QueueOptimizeText, Mode=OneWay}" Visibility="{x:Bind services:Format.Visible(ViewModel.HasQueue), Mode=OneWay}" />
+        </Grid>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="4" ColumnSpacing="14">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="3*" MinWidth="220" MaxWidth="360" />
-        <ColumnDefinition Width="7*" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
 
-      <Border Style="{StaticResource CardStyle}" Padding="4">
-        <Grid>
+      <Border Style="{StaticResource CardStyle}">
+        <Grid RowSpacing="8">
           <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
-          <ListView x:Name="DriveList" ItemsSource="{x:Bind ViewModel.Drives}" SelectedItem="{x:Bind ViewModel.Selected, Mode=TwoWay}" SelectionMode="Single"
-                    IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" AutomationProperties.Name="{x:Bind ViewModel.S.DrivesTitle}">
-            <ListView.ItemTemplate>
-              <DataTemplate x:DataType="vm:DriveRow">
-                <Grid ColumnSpacing="10" RowSpacing="6" Padding="0,10,4,10">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                  </Grid.ColumnDefinitions>
-                  <CheckBox MinWidth="0" VerticalAlignment="Top" IsChecked="{x:Bind IsQueued, Mode=TwoWay}" AutomationProperties.Name="{x:Bind QueueName, Mode=OneWay}"
-                            ToolTipService.ToolTip="{x:Bind QueueName, Mode=OneWay}" />
-                  <Border Grid.Column="1" Width="34" Height="34" CornerRadius="8" Background="{ThemeResource NiskalaPlateBrush}" VerticalAlignment="Top">
-                    <FontIcon Glyph="&#xEDA2;" FontSize="15" Foreground="{ThemeResource NiskalaMutedBrush}" />
-                  </Border>
-                  <StackPanel Grid.Column="2" Spacing="3">
-                    <Grid ColumnSpacing="8">
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Text="{x:Bind Title, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />
-                      <Border Grid.Column="1" Style="{StaticResource PillStyle}" Background="{ThemeResource NiskalaAccentSoftBrush}" BorderThickness="0">
-                        <TextBlock Text="{x:Bind Media, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" FontWeight="SemiBold" />
-                      </Border>
-                    </Grid>
-                    <TextBlock Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis">
-                      <Run Text="{x:Bind FileSystem, Mode=OneWay}" /><Run Text=" · " /><Run Text="{x:Bind Capacity, Mode=OneWay}" />
-                    </TextBlock>
-                    <ProgressBar Minimum="0" Maximum="100" Value="{x:Bind UsedPercent, Mode=OneWay}" IsIndeterminate="False" />
-                    <Grid ColumnSpacing="8">
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Text="{x:Bind Fragmentation, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="1" Text="{x:Bind Action, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" />
-                    </Grid>
-                  </StackPanel>
-                </Grid>
-              </DataTemplate>
-            </ListView.ItemTemplate>
-          </ListView>
-          <TextBlock Text="{x:Bind ViewModel.S.NoDrives}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                     Visibility="{x:Bind services:Format.Empty(ViewModel.Drives.Count), Mode=OneWay}" />
-          <StackPanel Grid.Row="1" Spacing="6" Padding="8,8,8,6" Visibility="{x:Bind services:Format.Visible(ViewModel.HasQueue), Mode=OneWay}">
-            <TextBlock Text="{x:Bind ViewModel.S.QueueHint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
-            <Button HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.AnalyzeQueueCommand}" Content="{x:Bind ViewModel.QueueAnalyzeText, Mode=OneWay}"
-                    AutomationProperties.Name="{x:Bind ViewModel.QueueAnalyzeText, Mode=OneWay}" />
-            <Button x:Name="QueueButton" HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}" Click="OnOptimizeQueue"
-                    IsEnabled="{x:Bind ViewModel.CanQueueNow, Mode=OneWay}" Content="{x:Bind ViewModel.QueueOptimizeText, Mode=OneWay}"
-                    AutomationProperties.Name="{x:Bind ViewModel.QueueOptimizeText, Mode=OneWay}" />
-          </StackPanel>
-        </Grid>
-      </Border>
+          <SelectorBar x:Name="Tabs" SelectionChanged="OnTabChanged">
+            <SelectorBarItem x:Name="MapTab" Text="{x:Bind ViewModel.S.TabMap}">
+              <SelectorBarItem.Icon>
+                <FontIcon Glyph="&#xF0E2;" />
+              </SelectorBarItem.Icon>
+            </SelectorBarItem>
+            <SelectorBarItem x:Name="FragmentsTab" Text="{x:Bind ViewModel.S.TabFragmented}" IsEnabled="{x:Bind ViewModel.IsHdd, Mode=OneWay}">
+              <SelectorBarItem.Icon>
+                <FontIcon Glyph="&#xE8B7;" />
+              </SelectorBarItem.Icon>
+            </SelectorBarItem>
+            <SelectorBarItem x:Name="SummaryTab" Text="{x:Bind ViewModel.S.TabHealth}">
+              <SelectorBarItem.Icon>
+                <FontIcon Glyph="&#xE9D9;" />
+              </SelectorBarItem.Icon>
+            </SelectorBarItem>
+          </SelectorBar>
 
-      <Border Grid.Column="1" Style="{StaticResource CardStyle}">
-        <Grid RowSpacing="10">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="2*" MinHeight="96" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="3*" MinHeight="140" />
-          </Grid.RowDefinitions>
-
-          <StackPanel Spacing="2">
-            <TextBlock Text="{x:Bind ViewModel.SelectedTitle, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="16" TextTrimming="CharacterEllipsis" />
-            <TextBlock Text="{x:Bind ViewModel.SelectedFacts, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
-          </StackPanel>
-
-          <Grid Grid.Row="1" ColumnSpacing="8" RowSpacing="6">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+          <Grid Grid.Row="1" RowSpacing="8" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowMap), Mode=OneWay}">
             <Grid.RowDefinitions>
+              <RowDefinition Height="2*" MinHeight="120" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <Button Command="{x:Bind ViewModel.AnalyzeCommand}" AutomationProperties.Name="{x:Bind ViewModel.AnalyzeText, Mode=OneWay}">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <FontIcon Glyph="&#xE9D9;" FontSize="13" />
-                <TextBlock Text="{x:Bind ViewModel.AnalyzeText, Mode=OneWay}" />
-              </StackPanel>
-            </Button>
-            <ToggleButton Grid.Column="1" IsChecked="{x:Bind ViewModel.IsGuideOpen, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.HasSelection, Mode=OneWay}"
-                          AutomationProperties.Name="{x:Bind ViewModel.S.GuideButton}" ToolTipService.ToolTip="{x:Bind ViewModel.S.GuideTitle}">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <FontIcon Glyph="&#xE82F;" FontSize="13" />
-                <TextBlock Text="{x:Bind ViewModel.S.GuideButton}" />
-              </StackPanel>
-            </ToggleButton>
-            <ComboBox Grid.Column="2" ItemsSource="{x:Bind ViewModel.Modes}" SelectedIndex="{x:Bind ViewModel.ModeIndex, Mode=TwoWay}" HorizontalAlignment="Stretch"
-                      MinWidth="140" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" AutomationProperties.Name="{x:Bind ViewModel.S.DriveModeLabel}"
-                      Visibility="{x:Bind services:Format.Visible(ViewModel.ShowModes), Mode=OneWay}" />
-            <Button x:Name="PrimaryButton" Grid.Column="3" Style="{StaticResource AccentButtonStyle}" Click="OnPrimary" IsEnabled="{x:Bind ViewModel.CanPrimary, Mode=OneWay}"
-                    AutomationProperties.Name="{x:Bind ViewModel.PrimaryText, Mode=OneWay}">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <FontIcon Glyph="&#xE768;" FontSize="13" />
-                <TextBlock Text="{x:Bind ViewModel.PrimaryText, Mode=OneWay}" />
-              </StackPanel>
-            </Button>
-            <Button Grid.Column="4" Content="{x:Bind ViewModel.S.Cancel}" Command="{x:Bind ViewModel.CancelCommand}" />
-            <TextBlock Grid.Row="1" Grid.ColumnSpan="5" Text="{x:Bind ViewModel.ModeHint, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
-                       Visibility="{x:Bind services:Format.Visible(ViewModel.ShowModes), Mode=OneWay}" />
-            <TextBlock Grid.Row="1" Grid.ColumnSpan="5" Text="{x:Bind ViewModel.S.SsdNote}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
-                       Visibility="{x:Bind services:Format.Visible(ViewModel.ShowSsdNote), Mode=OneWay}" />
-          </Grid>
-
-          <Border Grid.Row="2" CornerRadius="8" Padding="12,10" Background="{ThemeResource NiskalaBackgroundBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1"
-                  Visibility="{x:Bind services:Format.Visible(ViewModel.IsGuideOpen), Mode=OneWay}">
-            <ScrollViewer MaxHeight="280" VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="6">
-                <TextBlock Text="{x:Bind ViewModel.S.GuideTitle}" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                <TextBlock Text="{x:Bind ViewModel.GuideVerdict, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Strategies}" IsTabStop="False">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:StrategyRow">
-                      <Grid ColumnSpacing="12" Padding="0,8,0,4" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,1,0,0">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="{x:Bind Title}" Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
-                            <Border Style="{StaticResource PillStyle}" Background="{ThemeResource NiskalaAccentSoftBrush}" BorderThickness="0">
-                              <TextBlock Text="{x:Bind FitText}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" />
-                            </Border>
-                          </StackPanel>
-                          <TextBlock Text="{x:Bind Hint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
-                          <TextBlock Text="{x:Bind ModeText}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" Visibility="{x:Bind services:Format.Visible(CanApply)}" />
-                        </StackPanel>
-                        <Button Grid.Column="1" VerticalAlignment="Center" Content="{x:Bind ApplyText}" Command="{x:Bind Apply}"
-                                AutomationProperties.Name="{x:Bind Title}" Visibility="{x:Bind services:Format.Visible(CanApply)}" />
-                      </Grid>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Button Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.OptimizeCommand}" Content="{x:Bind ViewModel.S.DriveTrim}"
-                        Visibility="{x:Bind services:Format.Visible(ViewModel.GuideShowsTrim), Mode=OneWay}" />
-              </StackPanel>
-            </ScrollViewer>
-          </Border>
-
-          <Grid Grid.Row="3" ColumnSpacing="12" RowSpacing="4">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <ProgressBar IsIndeterminate="False" Minimum="0" Maximum="100" Value="{x:Bind ViewModel.Percent, Mode=OneWay}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.PercentText, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" FontFamily="{StaticResource NiskalaMonoFont}"
-                       MinWidth="44" TextAlignment="Right" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Elapsed, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" FontFamily="{StaticResource NiskalaMonoFont}" VerticalAlignment="Center" />
-            <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{x:Bind ViewModel.Activity, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis"
-                       Visibility="{x:Bind services:Format.VisibleText(ViewModel.Activity), Mode=OneWay}" />
-          </Grid>
-
-          <Border Grid.Row="4" CornerRadius="8" Padding="8" Background="{ThemeResource NiskalaBackgroundBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1">
-            <Grid>
-              <views:DriveMapView x:Name="Map" FreeBrush="{ThemeResource NiskalaMapFreeBrush}" UsedBrush="{ThemeResource NiskalaMapUsedBrush}"
-                                  FragmentedBrush="{ThemeResource NiskalaMapFragmentedBrush}" ArchiveBrush="{ThemeResource NiskalaMapArchiveBrush}"
-                                  SystemBrush="{ThemeResource NiskalaMapSystemBrush}" HighlightBrush="{ThemeResource NiskalaAccentBrush}"
-                                  AutomationProperties.Name="{x:Bind ViewModel.S.LegendUsed}" AutomationProperties.HelpText="{x:Bind ViewModel.S.MapHint}"
-                                  ToolTipService.ToolTip="{x:Bind ViewModel.S.MapHint}" />
-              <TextBlock Text="{x:Bind ViewModel.S.DriveMapEmpty}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
-                         Visibility="{x:Bind services:Format.Visible(ViewModel.ShowMapEmpty), Mode=OneWay}" />
-            </Grid>
-          </Border>
-
-          <ItemsControl Grid.Row="5" IsTabStop="False">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="150" ItemHeight="22" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapFreeBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1" />
-              <TextBlock Text="{x:Bind ViewModel.S.LegendFree}" Style="{StaticResource CaptionMutedStyle}" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapUsedBrush}" />
-              <TextBlock Text="{x:Bind ViewModel.S.LegendUsed}" Style="{StaticResource CaptionMutedStyle}" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapFragmentedBrush}" />
-              <TextBlock Text="{x:Bind ViewModel.S.LegendFragmented}" Style="{StaticResource CaptionMutedStyle}" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapArchiveBrush}" />
-              <TextBlock Text="{x:Bind ViewModel.S.LegendArchive}" Style="{StaticResource CaptionMutedStyle}" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapSystemBrush}" />
-              <TextBlock Text="{x:Bind ViewModel.S.LegendSystem}" Style="{StaticResource CaptionMutedStyle}" />
-            </StackPanel>
-          </ItemsControl>
-
-          <Grid Grid.Row="6" RowSpacing="8">
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-            <SelectorBar x:Name="Tabs" SelectionChanged="OnTabChanged">
-              <SelectorBarItem x:Name="FragmentsTab" Text="{x:Bind ViewModel.S.TabFragmented}" IsEnabled="{x:Bind ViewModel.IsHdd, Mode=OneWay}">
-                <SelectorBarItem.Icon>
-                  <FontIcon Glyph="&#xE8B7;" />
-                </SelectorBarItem.Icon>
-              </SelectorBarItem>
-              <SelectorBarItem x:Name="SummaryTab" Text="{x:Bind ViewModel.S.TabHealth}">
-                <SelectorBarItem.Icon>
-                  <FontIcon Glyph="&#xE9D9;" />
-                </SelectorBarItem.Icon>
-              </SelectorBarItem>
-              <SelectorBarItem x:Name="InspectorTab" Text="{x:Bind ViewModel.S.TabInspector}" IsEnabled="{x:Bind ViewModel.IsAnalyzed, Mode=OneWay}">
-                <SelectorBarItem.Icon>
-                  <FontIcon Glyph="&#xE71E;" />
-                </SelectorBarItem.Icon>
-              </SelectorBarItem>
-            </SelectorBar>
-
-            <Grid Grid.Row="1" RowSpacing="6" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowFragments), Mode=OneWay}">
-              <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-              </Grid.RowDefinitions>
-              <Grid ColumnSpacing="8">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="{x:Bind ViewModel.FragmentTitle, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                <Button Grid.Column="1" Content="{x:Bind ViewModel.S.CheckAll}" Command="{x:Bind ViewModel.CheckAllCommand}" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
-                        Visibility="{x:Bind services:Format.VisibleCount(ViewModel.Fragments.Count), Mode=OneWay}" />
-                <Button Grid.Column="2" Content="{x:Bind ViewModel.S.CheckNone}" Command="{x:Bind ViewModel.CheckNoneCommand}" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
-                        Visibility="{x:Bind services:Format.VisibleCount(ViewModel.Fragments.Count), Mode=OneWay}" />
-                <Button x:Name="CheckedButton" Grid.Column="3" Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.S.DefragChecked}" Click="OnDefragChecked"
-                        IsEnabled="{x:Bind ViewModel.CanDefragCheckedNow, Mode=OneWay}" />
+            <Border CornerRadius="8" Padding="8" Background="{ThemeResource NiskalaBackgroundBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1">
+              <Grid>
+                <views:DriveMapView x:Name="Map" FreeBrush="{ThemeResource NiskalaMapFreeBrush}" UsedBrush="{ThemeResource NiskalaMapUsedBrush}"
+                                    FragmentedBrush="{ThemeResource NiskalaMapFragmentedBrush}" ArchiveBrush="{ThemeResource NiskalaMapArchiveBrush}"
+                                    SystemBrush="{ThemeResource NiskalaMapSystemBrush}" ReservedBrush="{ThemeResource NiskalaMapReservedBrush}"
+                                    CompressedBrush="{ThemeResource NiskalaMapCompressedBrush}" HighlightBrush="{ThemeResource NiskalaAccentBrush}"
+                                    AutomationProperties.Name="{x:Bind ViewModel.S.TabMap}" AutomationProperties.HelpText="{x:Bind ViewModel.S.MapHint}"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.S.MapHint}" />
+                <TextBlock Text="{x:Bind ViewModel.S.DriveMapEmpty}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                           Visibility="{x:Bind services:Format.Visible(ViewModel.ShowMapEmpty), Mode=OneWay}" />
               </Grid>
-              <Grid Grid.Row="1">
-                <ListView ItemsSource="{x:Bind ViewModel.Fragments}" SelectionMode="None" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}">
-                  <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="vm:FragmentRow">
-                      <Grid ColumnSpacing="12" Padding="0,6">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="Auto" />
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="Auto" />
-                          <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <CheckBox MinWidth="0" IsChecked="{x:Bind IsChecked, Mode=TwoWay}" AutomationProperties.Name="{x:Bind Name}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="1">
-                          <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Text="{x:Bind Folder}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Path}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="1" VerticalAlignment="Center">
-                          <TextBlock Text="{x:Bind FragmentsText}" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Right" />
-                          <TextBlock Text="{x:Bind SizeText}" Style="{StaticResource CaptionMutedStyle}" HorizontalAlignment="Right" />
-                        </StackPanel>
-                        <Border Grid.Column="3" Style="{StaticResource PillStyle}" Background="{ThemeResource NiskalaAccentSoftBrush}" BorderThickness="0">
-                          <TextBlock Text="{x:Bind ZoneText}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" />
-                        </Border>
-                      </Grid>
-                    </DataTemplate>
-                  </ListView.ItemTemplate>
-                </ListView>
-                <TextBlock Text="{x:Bind ViewModel.FragmentsNote, Mode=OneWay}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
-                           Visibility="{x:Bind services:Format.VisibleText(ViewModel.FragmentsNote), Mode=OneWay}" />
-              </Grid>
-            </Grid>
+            </Border>
 
-            <ScrollViewer Grid.Row="1" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowSummary), Mode=OneWay}">
-              <StackPanel Spacing="6">
-                <TextBlock Text="{x:Bind ViewModel.S.HealthTitle}" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Health}" ItemTemplate="{StaticResource SummaryRowTemplate}" IsTabStop="False" />
-                <TextBlock Text="{x:Bind ViewModel.HealthNote, Mode=OneWay}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"
-                           Visibility="{x:Bind services:Format.VisibleText(ViewModel.HealthNote), Mode=OneWay}" />
-                <TextBlock Text="{x:Bind ViewModel.S.SummaryTitle}" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,10,0,0" />
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Summary}" ItemTemplate="{StaticResource SummaryRowTemplate}" IsTabStop="False" />
-                <TextBlock Text="{x:Bind ViewModel.S.DriveSummaryEmpty}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"
-                           Visibility="{x:Bind services:Format.Empty(ViewModel.Summary.Count), Mode=OneWay}" />
+            <ItemsControl Grid.Row="1" IsTabStop="False">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="176" ItemHeight="22" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapFreeBrush}" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="1" />
+                <TextBlock Text="{x:Bind ViewModel.S.LegendFree}" Style="{StaticResource CaptionMutedStyle}" />
               </StackPanel>
-            </ScrollViewer>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapUsedBrush}" />
+                <TextBlock Text="{x:Bind ViewModel.S.LegendUsed}" Style="{StaticResource CaptionMutedStyle}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapFragmentedBrush}" />
+                <TextBlock Text="{x:Bind ViewModel.S.LegendFragmented}" Style="{StaticResource CaptionMutedStyle}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapArchiveBrush}" />
+                <TextBlock Text="{x:Bind ViewModel.S.LegendArchive}" Style="{StaticResource CaptionMutedStyle}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapCompressedBrush}" />
+                <TextBlock Text="{x:Bind ViewModel.S.LegendCompressed}" Style="{StaticResource CaptionMutedStyle}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapReservedBrush}" />
+                <TextBlock Text="{x:Bind ViewModel.S.LegendReserved}" Style="{StaticResource CaptionMutedStyle}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Border Style="{StaticResource LegendSwatchStyle}" Background="{ThemeResource NiskalaMapSystemBrush}" />
+                <TextBlock Text="{x:Bind ViewModel.S.LegendSystem}" Style="{StaticResource CaptionMutedStyle}" />
+              </StackPanel>
+            </ItemsControl>
 
-            <Grid Grid.Row="1" RowSpacing="6" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowInspector), Mode=OneWay}">
+            <Grid Grid.Row="2" RowSpacing="6" MaxHeight="260">
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -371,8 +345,12 @@
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{x:Bind ViewModel.InspectorTitle, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <Button Grid.Column="1" Content="{x:Bind ViewModel.S.InspectorClear}" Command="{x:Bind ViewModel.ClearInspectionCommand}"
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{x:Bind ViewModel.S.TabInspector}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                  <TextBlock Text="{x:Bind ViewModel.InspectorTitle, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
+                             Visibility="{x:Bind services:Format.VisibleText(ViewModel.InspectorTitle), Mode=OneWay}" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="{x:Bind ViewModel.S.InspectorClear}" Command="{x:Bind ViewModel.ClearInspectionCommand}" VerticalAlignment="Top"
                         Visibility="{x:Bind services:Format.Visible(ViewModel.HasInspection), Mode=OneWay}" />
               </Grid>
               <TextBlock Grid.Row="1" Text="{x:Bind ViewModel.InspectorDetail, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
@@ -407,7 +385,209 @@
               </Grid>
             </Grid>
           </Grid>
+
+          <Grid Grid.Row="1" RowSpacing="6" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowFragments), Mode=OneWay}">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid ColumnSpacing="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="{x:Bind ViewModel.FragmentTitle, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <Button Grid.Column="1" Content="{x:Bind ViewModel.S.CheckAll}" Command="{x:Bind ViewModel.CheckAllCommand}" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                      Visibility="{x:Bind services:Format.VisibleCount(ViewModel.Fragments.Count), Mode=OneWay}" />
+              <Button Grid.Column="2" Content="{x:Bind ViewModel.S.CheckNone}" Command="{x:Bind ViewModel.CheckNoneCommand}" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                      Visibility="{x:Bind services:Format.VisibleCount(ViewModel.Fragments.Count), Mode=OneWay}" />
+              <Button x:Name="CheckedButton" Grid.Column="3" Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ViewModel.S.DefragChecked}" Click="OnDefragChecked"
+                      IsEnabled="{x:Bind ViewModel.CanDefragCheckedNow, Mode=OneWay}" />
+            </Grid>
+            <Grid Grid.Row="1">
+              <ListView ItemsSource="{x:Bind ViewModel.Fragments}" SelectionMode="None" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}">
+                <ListView.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FragmentRow">
+                    <Grid ColumnSpacing="12" Padding="0,6">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <CheckBox MinWidth="0" IsChecked="{x:Bind IsChecked, Mode=TwoWay}" AutomationProperties.Name="{x:Bind Name}" VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="1" Spacing="1">
+                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{x:Bind Folder}" Style="{StaticResource CaptionMutedStyle}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Path}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2" Spacing="1" VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind FragmentsText}" Style="{StaticResource CaptionTextBlockStyle}" HorizontalAlignment="Right" />
+                        <TextBlock Text="{x:Bind SizeText}" Style="{StaticResource CaptionMutedStyle}" HorizontalAlignment="Right" />
+                      </StackPanel>
+                      <Border Grid.Column="3" Style="{StaticResource PillStyle}" Background="{ThemeResource NiskalaAccentSoftBrush}" BorderThickness="0">
+                        <TextBlock Text="{x:Bind ZoneText}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" />
+                      </Border>
+                    </Grid>
+                  </DataTemplate>
+                </ListView.ItemTemplate>
+              </ListView>
+              <TextBlock Text="{x:Bind ViewModel.FragmentsNote, Mode=OneWay}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                         Visibility="{x:Bind services:Format.VisibleText(ViewModel.FragmentsNote), Mode=OneWay}" />
+            </Grid>
+          </Grid>
+
+          <ScrollViewer Grid.Row="1" Visibility="{x:Bind services:Format.Visible(ViewModel.ShowSummary), Mode=OneWay}">
+            <StackPanel Spacing="6" Padding="0,0,12,0">
+              <TextBlock Text="{x:Bind ViewModel.S.HealthTitle}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+              <ItemsControl ItemsSource="{x:Bind ViewModel.Health}" ItemTemplate="{StaticResource SummaryRowTemplate}" IsTabStop="False" />
+              <TextBlock Text="{x:Bind ViewModel.HealthNote, Mode=OneWay}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"
+                         Visibility="{x:Bind services:Format.VisibleText(ViewModel.HealthNote), Mode=OneWay}" />
+              <StackPanel Spacing="4" Margin="0,10,0,0" Visibility="{x:Bind services:Format.VisibleCount(ViewModel.Attributes.Count), Mode=OneWay}">
+                <TextBlock Text="{x:Bind ViewModel.S.AttributesTitle}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                <Grid ColumnSpacing="10" Padding="2,4" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,0,0,1">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="5*" />
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="1*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{x:Bind ViewModel.S.AttributeId}" Style="{StaticResource ColumnHeaderStyle}" />
+                  <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.S.AttributeName}" Style="{StaticResource ColumnHeaderStyle}" />
+                  <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.S.AttributeCurrent}" Style="{StaticResource ColumnHeaderStyle}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="3" Text="{x:Bind ViewModel.S.AttributeWorst}" Style="{StaticResource ColumnHeaderStyle}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="4" Text="{x:Bind ViewModel.S.AttributeThreshold}" Style="{StaticResource ColumnHeaderStyle}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="5" Text="{x:Bind ViewModel.S.AttributeRaw}" Style="{StaticResource ColumnHeaderStyle}" TextAlignment="Right" />
+                  <TextBlock Grid.Column="6" Text="{x:Bind ViewModel.S.ColumnStatus}" Style="{StaticResource ColumnHeaderStyle}" />
+                </Grid>
+                <ItemsControl ItemsSource="{x:Bind ViewModel.Attributes}" IsTabStop="False">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AttributeRow">
+                      <Grid ColumnSpacing="10" Padding="2,4" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,0,0,1">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="1*" />
+                          <ColumnDefinition Width="5*" />
+                          <ColumnDefinition Width="1*" />
+                          <ColumnDefinition Width="1*" />
+                          <ColumnDefinition Width="1*" />
+                          <ColumnDefinition Width="2*" />
+                          <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind Id}" Style="{StaticResource CellTextStyle}" FontFamily="{StaticResource NiskalaMonoFont}" />
+                        <TextBlock Grid.Column="1" Text="{x:Bind Name}" Style="{StaticResource CellTextStyle}" />
+                        <TextBlock Grid.Column="2" Text="{x:Bind Current}" Style="{StaticResource CellTextStyle}" TextAlignment="Right" />
+                        <TextBlock Grid.Column="3" Text="{x:Bind Worst}" Style="{StaticResource CellTextStyle}" TextAlignment="Right" />
+                        <TextBlock Grid.Column="4" Text="{x:Bind Threshold}" Style="{StaticResource CellTextStyle}" TextAlignment="Right" />
+                        <TextBlock Grid.Column="5" Text="{x:Bind Raw}" Style="{StaticResource CellTextStyle}" TextAlignment="Right" IsTextSelectionEnabled="True" />
+                        <TextBlock Grid.Column="6" Text="{x:Bind State}" Style="{StaticResource CellTextStyle}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+              <TextBlock Text="{x:Bind ViewModel.S.SummaryTitle}" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,10,0,0" />
+              <ItemsControl ItemsSource="{x:Bind ViewModel.Summary}" ItemTemplate="{StaticResource SummaryRowTemplate}" IsTabStop="False" />
+              <TextBlock Text="{x:Bind ViewModel.S.DriveSummaryEmpty}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"
+                         Visibility="{x:Bind services:Format.Empty(ViewModel.Summary.Count), Mode=OneWay}" />
+            </StackPanel>
+          </ScrollViewer>
         </Grid>
+      </Border>
+
+      <Border x:Name="GuideDrawer" Grid.Column="1" Style="{StaticResource CardStyle}" Width="340" Visibility="{x:Bind services:Format.Visible(ViewModel.IsGuideOpen), Mode=OneWay}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="10" Padding="0,0,8,0">
+            <Grid ColumnSpacing="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Spacing="2">
+                <TextBlock Text="{x:Bind ViewModel.S.GuideButton}" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="16" />
+                <TextBlock Text="{x:Bind ViewModel.S.GuideTitle}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
+              </StackPanel>
+              <Button Grid.Column="1" VerticalAlignment="Top" Command="{x:Bind ViewModel.CloseGuideCommand}" AutomationProperties.Name="{x:Bind ViewModel.S.GuideClose}"
+                      ToolTipService.ToolTip="{x:Bind ViewModel.S.GuideClose}">
+                <FontIcon Glyph="&#xE711;" FontSize="12" />
+              </Button>
+            </Grid>
+
+            <TextBlock Text="{x:Bind ViewModel.S.GuideGoalLabel}" Style="{StaticResource CaptionMutedStyle}" />
+            <Grid ColumnSpacing="6">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
+              </Grid.ColumnDefinitions>
+              <ToggleButton HorizontalAlignment="Stretch" IsChecked="{x:Bind ViewModel.IsSpeedGoal, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.GuideGoalsEnabled, Mode=OneWay}"
+                            AutomationProperties.Name="{x:Bind ViewModel.SpeedGoalName}">
+                <TextBlock Text="{x:Bind ViewModel.SpeedGoalName}" TextWrapping="Wrap" TextAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
+              </ToggleButton>
+              <ToggleButton Grid.Column="1" HorizontalAlignment="Stretch" IsChecked="{x:Bind ViewModel.IsImpactGoal, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.GuideGoalsEnabled, Mode=OneWay}"
+                            AutomationProperties.Name="{x:Bind ViewModel.ImpactGoalName}">
+                <TextBlock Text="{x:Bind ViewModel.ImpactGoalName}" TextWrapping="Wrap" TextAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
+              </ToggleButton>
+              <ToggleButton Grid.Column="2" HorizontalAlignment="Stretch" IsChecked="{x:Bind ViewModel.IsReclaimGoal, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.GuideGoalsEnabled, Mode=OneWay}"
+                            AutomationProperties.Name="{x:Bind ViewModel.ReclaimGoalName}">
+                <TextBlock Text="{x:Bind ViewModel.ReclaimGoalName}" TextWrapping="Wrap" TextAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
+              </ToggleButton>
+            </Grid>
+
+            <TextBlock Text="{x:Bind ViewModel.GuideVerdict, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
+
+            <Border CornerRadius="8" Padding="12,10" Background="{ThemeResource NiskalaAccentSoftBrush}" BorderBrush="{ThemeResource NiskalaAccentBrush}" BorderThickness="1">
+              <StackPanel Spacing="6">
+                <Grid ColumnSpacing="8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{x:Bind ViewModel.GuideMainTitle, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                  <Border Grid.Column="1" Style="{StaticResource PillStyle}" Background="{ThemeResource NiskalaSurfaceBrush}" BorderThickness="0" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind ViewModel.GuideMainFit, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" FontWeight="SemiBold" />
+                  </Border>
+                </Grid>
+                <TextBlock Text="{x:Bind ViewModel.GuideMainHint, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+                <TextBlock Text="{x:Bind ViewModel.GuideMainMode, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap"
+                           Visibility="{x:Bind services:Format.VisibleText(ViewModel.GuideMainMode), Mode=OneWay}" />
+                <Button x:Name="ApplyGuideButton" HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}" Click="OnApplyGuide"
+                        IsEnabled="{x:Bind ViewModel.CanApplyGuideNow, Mode=OneWay}" Content="{x:Bind ViewModel.S.GuideApplyRecommendation}"
+                        AutomationProperties.Name="{x:Bind ViewModel.S.GuideApplyRecommendation}" />
+              </StackPanel>
+            </Border>
+
+            <TextBlock Text="{x:Bind ViewModel.S.GuideAlternatives}" Style="{StaticResource CaptionMutedStyle}" Margin="0,4,0,0"
+                       Visibility="{x:Bind services:Format.VisibleCount(ViewModel.Strategies.Count), Mode=OneWay}" />
+            <ItemsControl ItemsSource="{x:Bind ViewModel.Strategies}" IsTabStop="False">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:StrategyRow">
+                  <Grid ColumnSpacing="10" Padding="0,8,0,6" BorderBrush="{ThemeResource NiskalaStrokeBrush}" BorderThickness="0,1,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="3">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{x:Bind Title}" Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        <Border Style="{StaticResource PillStyle}" Background="{ThemeResource NiskalaAccentSoftBrush}" BorderThickness="0" VerticalAlignment="Center">
+                          <TextBlock Text="{x:Bind FitText}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource NiskalaAccentBrush}" />
+                        </Border>
+                      </StackPanel>
+                      <TextBlock Text="{x:Bind Hint}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" />
+                      <TextBlock Text="{x:Bind ModeText}" Style="{StaticResource CaptionMutedStyle}" TextWrapping="Wrap" Visibility="{x:Bind services:Format.Visible(CanApply)}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" VerticalAlignment="Center" Content="{x:Bind ApplyText}" Command="{x:Bind Apply}"
+                            AutomationProperties.Name="{x:Bind Title}" Visibility="{x:Bind services:Format.Visible(CanApply)}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
       </Border>
     </Grid>
   </Grid>

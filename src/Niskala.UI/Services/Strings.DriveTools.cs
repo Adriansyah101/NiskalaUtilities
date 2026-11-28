@@ -55,7 +55,7 @@ public sealed partial class Strings
     {
         StrategyFit.Recommended => T("Recommended", "Direkomendasikan"),
         StrategyFit.Limited => T("Limited room", "Ruang terbatas"),
-        StrategyFit.NotApplicable => T("Not applicable", "Tidak berlaku"),
+        StrategyFit.NotApplicable => T("Not advisable", "Tidak disarankan"),
         _ => T("Suitable", "Cocok"),
     };
 
@@ -107,6 +107,7 @@ public sealed partial class Strings
         OccupantState.Fragmented => LegendFragmented,
         OccupantState.Archive => LegendArchive,
         OccupantState.SystemLocked => LegendSystem,
+        OccupantState.Compressed => LegendCompressed,
         _ => T("Contiguous", "Rapi"),
     };
 
@@ -144,13 +145,15 @@ public sealed partial class Strings
         HealthSource.Ata => T("S.M.A.R.T. attributes", "Atribut S.M.A.R.T."),
         HealthSource.FailurePrediction => T("Windows failure prediction", "Prediksi kegagalan Windows"),
         HealthSource.Temperature => T("Temperature sensor only", "Hanya sensor suhu"),
+        HealthSource.SatPassThrough => T("S.M.A.R.T. through the USB bridge (SAT pass-through)", "S.M.A.R.T. lewat bridge USB (SAT pass-through)"),
+        HealthSource.NvmeBridge => T("NVMe health log through the USB bridge", "Log kesehatan NVMe lewat bridge USB"),
         _ => T("Nothing", "Tidak ada"),
     };
 
     public string HealthUnavailable(bool bridged) => bridged
         ? T(
-            "This drive's USB bridge does not pass S.M.A.R.T. data through, so its physical health cannot be read.",
-            "Bridge USB drive ini tidak meneruskan data S.M.A.R.T., jadi kesehatan fisiknya tidak dapat dibaca.")
+            "This drive's USB bridge answered neither SAT nor NVMe pass-through, so its physical health cannot be read.",
+            "Bridge USB drive ini tidak menjawab SAT maupun NVMe pass-through, jadi kesehatan fisiknya tidak dapat dibaca.")
         : T(
             "This drive does not report S.M.A.R.T. data to Windows.",
             "Drive ini tidak melaporkan data S.M.A.R.T. ke Windows.");
@@ -187,6 +190,7 @@ public sealed partial class Strings
         HealthWarning.Overheating => T("temperature is over the warning limit", "suhu melewati batas peringatan"),
         HealthWarning.ReallocatedSectors => T("sectors were reallocated", "ada sektor yang dialihkan"),
         HealthWarning.PendingSectors => T("unstable sectors are waiting to be remapped", "ada sektor tidak stabil menunggu dipetakan ulang"),
+        HealthWarning.AttributeFailing => T("an attribute is at or below its failure threshold", "ada atribut di bawah ambang kegagalannya"),
         _ => string.Empty,
     };
 

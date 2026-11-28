@@ -35,6 +35,8 @@ public enum ClusterState : byte
     Fragmented,
     Archive,
     System,
+    MftReserved,
+    Compressed,
 }
 
 public sealed record DriveVolume(
@@ -49,7 +51,8 @@ public sealed record DriveVolume(
     bool TrimSupported,
     StorageBus Bus = StorageBus.Unknown,
     int RotationRate = MediaClassifier.RotationNotReported,
-    uint SerialNumber = 0)
+    uint SerialNumber = 0,
+    bool Probed = true)
 {
     private static readonly string[] MovableFileSystems = ["NTFS", "FAT", "FAT32", "exFAT"];
 

@@ -28,6 +28,8 @@ public sealed class DriveFile
 
     public bool IsLocked { get; internal set; }
 
+    public bool IsCompressed { get; internal set; }
+
     public long Clusters => Extents.Where(e => !e.IsVirtual).Sum(e => e.Clusters);
 
     public long StartLcn => Extents.FirstOrDefault(e => !e.IsVirtual).Lcn;
@@ -38,7 +40,7 @@ public sealed class DriveFile
 
     public bool IsMovable => Extents.Length > 0 && Extents[0].Vcn == 0 && Extents.All(e => !e.IsVirtual) && IsContiguousInFile(Extents);
 
-    public ClusterState State => IsFragmented ? ClusterState.Fragmented : Zone == SpeedZone.Archive ? ClusterState.Archive : ClusterState.Used;
+    public ClusterState State => IsCompressed ? ClusterState.Compressed : IsFragmented ? ClusterState.Fragmented : Zone == SpeedZone.Archive ? ClusterState.Archive : ClusterState.Used;
 
     public static int CountFragments(IReadOnlyList<Extent> extents)
     {
@@ -91,13 +93,17 @@ public sealed record DriveSummary(
     int Protected,
     int Locked,
     int Inaccessible,
-    int ResidentFiles = 0);
+    int ResidentFiles = 0,
+    int FreeFragments = 0,
+    int CompressedFiles = 0,
+    long ReservedClusters = 0);
 
 public sealed class DriveAnalysis
 {
-    internal DriveAnalysis(DriveVolume volume, ClusterBitmap bitmap, DriveMap map, List<DriveFile> files, ScanCounts counts, ScanMethod method)
+    internal DriveAnalysis(DriveVolume volume, ClusterBitmap bitmap, DriveMap map, List<DriveFile> files, ScanCounts counts, ScanMethod method, IReadOnlyList<FreeRun>? reserved = null)
     {
         Volume = volume;
+        Reserved = reserved ?? [];
         Method = method;
         Bitmap = bitmap;
         Free = FreeSpaceIndex.From(bitmap);
@@ -123,6 +129,8 @@ public sealed class DriveAnalysis
 
     public IReadOnlyList<DriveFile> Files { get; }
 
+    public IReadOnlyList<FreeRun> Reserved { get; }
+
     public ZoneLayout Layout { get; }
 
     public DateTimeOffset AnalyzedAt { get; }
@@ -134,7 +142,7 @@ public sealed class DriveAnalysis
     public DriveSummary Summary()
     {
         long clusters = 0, fragmentedClusters = 0, excess = 0;
-        int fragmented = 0, fast = 0, standard = 0, archive = 0, locked = Counts.Locked;
+        int fragmented = 0, fast = 0, standard = 0, archive = 0, compressed = 0, locked = Counts.Locked;
         foreach (DriveFile file in Files)
         {
             long size = file.Clusters;
@@ -150,6 +158,11 @@ public sealed class DriveAnalysis
             if (file.IsLocked)
             {
                 locked++;
+            }
+
+            if (file.IsCompressed)
+            {
+                compressed++;
             }
 
             switch (file.Zone)
@@ -180,7 +193,10 @@ public sealed class DriveAnalysis
             Counts.Protected,
             locked,
             Counts.Inaccessible,
-            Counts.Resident);
+            Counts.Resident,
+            Free.Count,
+            compressed,
+            Reserved.Sum(r => r.Length));
     }
 }
 
@@ -250,7 +266,15 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             : ReadFileTable(session, scan, cancellationToken) is { } records
             ? ScanFileTable(session, records, scan, cancellationToken)
             : WalkFolders(session, scan, cancellationToken);
-        var analysis = new DriveAnalysis(volume, bitmap, map, scan.Files, scan.Counts(), method);
+        var layout = new List<FreeRun>();
+        if (session.ReadReserved(layout) != 0)
+        {
+            layout.Clear();
+        }
+
+        IReadOnlyList<FreeRun> reserved = ReservedArea.Merge([.. scan.Metadata, .. layout], bitmap.Clusters);
+        map.Reserve(reserved);
+        var analysis = new DriveAnalysis(volume, bitmap, map, scan.Files, scan.Counts(), method, reserved);
         progress?.Report(new DriveProgress(DrivePhase.Finished, 100, volume.Name, map.Version, map));
         return analysis;
     }
@@ -385,7 +409,7 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             return;
         }
 
-        scan.Add(folder.Full, record.Name, error, facts.Size, facts.LastWriteUtc, extents);
+        scan.Add(folder.Full, record.Name, error, facts.Size, facts.LastWriteUtc, extents, record.Attributes.HasFlag(FileAttributes.Compressed));
     }
 
     private static ScanMethod WalkFolders(IVolumeSession session, Scan scan, CancellationToken cancellationToken)
@@ -432,7 +456,7 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
                     continue;
                 }
 
-                scan.Add(folder.Full, entry.Name, error, entry.Size, entry.LastWriteUtc, extents);
+                scan.Add(folder.Full, entry.Name, error, entry.Size, entry.LastWriteUtc, extents, entry.IsCompressed);
             }
         }
 
@@ -468,6 +492,7 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             if (entry.Number < FileTableScan.FirstUserRecord)
             {
                 _system++;
+                scan.Meta(record.Extents);
                 return;
             }
 
@@ -489,7 +514,9 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             }
             else
             {
-                _files.Add((entry.Parent, scan.Create(entry.Name, record.Size, record.LastWriteUtc, extents)));
+                DriveFile file = scan.Create(entry.Name, record.Size, record.LastWriteUtc, extents);
+                file.IsCompressed = entry.Attributes.HasFlag(FileAttributes.Compressed);
+                _files.Add((entry.Parent, file));
             }
         }
 
@@ -597,6 +624,8 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
 
         public List<DriveFile> Files { get; } = [];
 
+        public List<FreeRun> Metadata { get; } = [];
+
         public int Protected { get; set; }
 
         public int Locked { get; set; }
@@ -640,6 +669,17 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             }
         }
 
+        public void Meta(Extent[]? extents)
+        {
+            foreach (Extent extent in extents ?? [])
+            {
+                if (!extent.IsVirtual && extent.Clusters > 0)
+                {
+                    Metadata.Add(new FreeRun(extent.Lcn, extent.Clusters));
+                }
+            }
+        }
+
         public void Folder(int error, IEnumerable<Extent> extents)
         {
             if (error == 0)
@@ -648,7 +688,7 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
             }
         }
 
-        public void Add(string folder, string name, int error, long size, DateTime lastWriteUtc, List<Extent> extents)
+        public void Add(string folder, string name, int error, long size, DateTime lastWriteUtc, List<Extent> extents, bool compressed = false)
         {
             if (error != 0)
             {
@@ -672,6 +712,7 @@ public sealed class DriveAnalyzer(IVolumeSystem system, TimeProvider? clock = nu
 
             DriveFile file = Create(name, size, lastWriteUtc, [.. extents]);
             file.Folder = folder;
+            file.IsCompressed = compressed;
             Adopt(file);
         }
 

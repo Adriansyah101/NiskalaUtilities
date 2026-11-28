@@ -43,7 +43,7 @@ public sealed partial class DriveOptimizerPage : UserControl
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(DriveOptimizerViewModel.Tab) or nameof(DriveOptimizerViewModel.Selected) or nameof(DriveOptimizerViewModel.IsAnalyzed))
+        if (e.PropertyName is nameof(DriveOptimizerViewModel.Tab) or nameof(DriveOptimizerViewModel.Selected) or nameof(DriveOptimizerViewModel.IsHdd))
         {
             SyncTab();
         }
@@ -54,8 +54,8 @@ public sealed partial class DriveOptimizerPage : UserControl
         SelectorBarItem wanted = ViewModel.Tab switch
         {
             DriveOptimizerViewModel.TabFragments when ViewModel.IsHdd => FragmentsTab,
-            DriveOptimizerViewModel.TabInspector when ViewModel.IsAnalyzed => InspectorTab,
-            _ => SummaryTab,
+            DriveOptimizerViewModel.TabSummary => SummaryTab,
+            _ => MapTab,
         };
         if (Tabs.SelectedItem != wanted)
         {
@@ -65,8 +65,8 @@ public sealed partial class DriveOptimizerPage : UserControl
 
     private void OnTabChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) =>
         ViewModel.Tab = sender.SelectedItem == FragmentsTab ? DriveOptimizerViewModel.TabFragments
-            : sender.SelectedItem == InspectorTab ? DriveOptimizerViewModel.TabInspector
-            : DriveOptimizerViewModel.TabSummary;
+            : sender.SelectedItem == SummaryTab ? DriveOptimizerViewModel.TabSummary
+            : DriveOptimizerViewModel.TabMap;
 
     private void OnBannerClosed(InfoBar sender, InfoBarClosedEventArgs args) => ViewModel.Banner.Clear();
 
@@ -100,6 +100,22 @@ public sealed partial class DriveOptimizerPage : UserControl
         }
 
         Confirm.Ask(QueueButton, Strings.Current.QueueConfirm, ViewModel.QueueOptimizeText, () => ViewModel.OptimizeQueueCommand.Execute(null));
+    }
+
+    private void OnApplyGuide(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.CanApplyGuideNow)
+        {
+            return;
+        }
+
+        if (!ViewModel.GuideMovesClusters)
+        {
+            ViewModel.ApplyGuideCommand.Execute(null);
+            return;
+        }
+
+        Confirm.Ask(ApplyGuideButton, Strings.Current.DriveDefragConfirm, Strings.Current.GuideApplyRecommendation, () => ViewModel.ApplyGuideCommand.Execute(null));
     }
 
     private void OnDefragChecked(object sender, RoutedEventArgs e)

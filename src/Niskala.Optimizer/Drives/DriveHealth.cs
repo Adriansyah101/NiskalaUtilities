@@ -11,6 +11,16 @@ public enum HealthSource
     Ata,
     FailurePrediction,
     Temperature,
+    SatPassThrough,
+    NvmeBridge,
+}
+
+public enum HealthProtocol
+{
+    Unknown,
+    Nvme,
+    Sata,
+    Scsi,
 }
 
 public enum HealthStatus
@@ -32,6 +42,17 @@ public enum HealthWarning
     Overheating = 32,
     ReallocatedSectors = 64,
     PendingSectors = 128,
+    AttributeFailing = 256,
+}
+
+public sealed record AtaAttribute(byte Id, int Current, int Worst, int? Threshold, long Raw)
+{
+    public bool Failing => Threshold is { } threshold && threshold > 0 && Current > 0 && Current <= threshold;
+}
+
+public sealed record NvmeCounters(long DataUnitsRead, long DataUnitsWritten, long PowerCycles, long UnsafeShutdowns, long MediaErrors, long ErrorLogEntries)
+{
+    public const long BytesPerDataUnit = 512_000;
 }
 
 public sealed record DriveHealth(
@@ -41,17 +62,27 @@ public sealed record DriveHealth(
     long? PowerOnHours,
     int? LifeUsedPercent,
     int? AvailableSparePercent,
-    bool Bridged = false)
+    bool Bridged = false,
+    HealthProtocol Protocol = HealthProtocol.Unknown,
+    string? Bridge = null,
+    string? Model = null,
+    IReadOnlyList<AtaAttribute>? Attributes = null,
+    NvmeCounters? Counters = null,
+    long? ReallocatedSectors = null,
+    long? PendingSectors = null,
+    long? UncorrectableSectors = null)
 {
     public static DriveHealth NotRead { get; } = new(HealthSource.None, HealthWarning.None, null, null, null, null);
 
     public HealthStatus Status => Warnings != HealthWarning.None ? HealthStatus.Warning
-        : Source is HealthSource.Nvme or HealthSource.Ata or HealthSource.FailurePrediction ? HealthStatus.Healthy
+        : Source is HealthSource.Nvme or HealthSource.Ata or HealthSource.FailurePrediction or HealthSource.SatPassThrough or HealthSource.NvmeBridge ? HealthStatus.Healthy
         : HealthStatus.Unknown;
 
     public bool HasData => Source != HealthSource.None;
 
     public int? LifeRemainingPercent => LifeUsedPercent is { } used ? Math.Clamp(100 - used, 0, 100) : null;
+
+    public IReadOnlyList<AtaAttribute> Table => Attributes ?? [];
 
     public static DriveHealth Unavailable(DriveVolume volume)
     {
@@ -82,8 +113,18 @@ public static class SmartParser
     private const int NvmeAvailableSpare = 3;
     private const int NvmeSpareThreshold = 4;
     private const int NvmePercentageUsed = 5;
+    private const int NvmeDataUnitsRead = 32;
+    private const int NvmeDataUnitsWritten = 48;
+    private const int NvmePowerCycles = 112;
     private const int NvmePowerOnHours = 128;
-    private const int NvmeLogMinimum = NvmePowerOnHours + 16;
+    private const int NvmeUnsafeShutdowns = 144;
+    private const int NvmeMediaErrors = 160;
+    private const int NvmeErrorEntries = 176;
+    private const int NvmeCounterBytes = 16;
+    private const int NvmeLogMinimum = NvmePowerOnHours + NvmeCounterBytes;
+    private const int NvmeCountersMinimum = NvmeErrorEntries + NvmeCounterBytes;
+    private const int AttributeWorst = 4;
+    private const int ThresholdValue = 1;
     private const int AttributeCurrent = 3;
     private const int AttributeRaw = 5;
     private const int HighestNormalized = 100;
@@ -138,19 +179,61 @@ public static class SmartParser
         }
 
         int kelvin = BinaryPrimitives.ReadUInt16LittleEndian(log[NvmeTemperature..]);
-        ulong high = BinaryPrimitives.ReadUInt64LittleEndian(log[(NvmePowerOnHours + 8)..]);
-        ulong hours = BinaryPrimitives.ReadUInt64LittleEndian(log[NvmePowerOnHours..]);
+        NvmeCounters? counters = log.Length >= NvmeCountersMinimum
+            ? new NvmeCounters(
+                Counter(log, NvmeDataUnitsRead),
+                Counter(log, NvmeDataUnitsWritten),
+                Counter(log, NvmePowerCycles),
+                Counter(log, NvmeUnsafeShutdowns),
+                Counter(log, NvmeMediaErrors),
+                Counter(log, NvmeErrorEntries))
+            : null;
         return new DriveHealth(
             HealthSource.Nvme,
             warnings,
             kelvin == 0 ? null : Celsius(kelvin - KelvinOffset),
-            high != 0 || hours > long.MaxValue ? long.MaxValue : (long)hours,
+            Counter(log, NvmePowerOnHours),
             Math.Min(used, byte.MaxValue),
-            spare <= HighestNormalized ? spare : null);
+            spare <= HighestNormalized ? spare : null,
+            Protocol: HealthProtocol.Nvme,
+            Counters: counters);
     }
 
-    public static DriveHealth FromAta(bool predicted, ReadOnlySpan<byte> data, bool solidState)
+    public static long Counter(ReadOnlySpan<byte> log, int offset)
     {
+        ulong high = BinaryPrimitives.ReadUInt64LittleEndian(log[(offset + 8)..]);
+        ulong low = BinaryPrimitives.ReadUInt64LittleEndian(log[offset..]);
+        return high != 0 || low > long.MaxValue ? long.MaxValue : (long)low;
+    }
+
+    public static IReadOnlyDictionary<byte, int> Thresholds(ReadOnlySpan<byte> data)
+    {
+        var thresholds = new Dictionary<byte, int>();
+        for (int index = 0; index < AttributeCount; index++)
+        {
+            int offset = AttributeTableOffset + (index * AttributeBytes);
+            if (offset + AttributeBytes > data.Length)
+            {
+                break;
+            }
+
+            byte id = data[offset];
+            if (id != 0)
+            {
+                thresholds[id] = data[offset + ThresholdValue];
+            }
+        }
+
+        return thresholds;
+    }
+
+    public static DriveHealth FromAta(bool predicted, ReadOnlySpan<byte> data, bool solidState) => FromAta(predicted, data, solidState, ReadOnlySpan<byte>.Empty);
+
+    public static DriveHealth FromAta(bool predicted, ReadOnlySpan<byte> data, bool solidState, ReadOnlySpan<byte> thresholdData)
+    {
+        IReadOnlyDictionary<byte, int> thresholds = Thresholds(thresholdData);
+        var attributes = new List<AtaAttribute>();
+        long? reallocated = null, pending = null, uncorrectable = null;
         HealthWarning warnings = predicted ? HealthWarning.FailurePredicted : HealthWarning.None;
         int? temperature = null, airflow = null, life = null;
         long? hours = null;
@@ -173,6 +256,13 @@ public static class SmartParser
 
             table = true;
             long raw = Raw(attribute);
+            var entry = new AtaAttribute(id, attribute[AttributeCurrent], attribute[AttributeWorst], thresholds.TryGetValue(id, out int limit) ? limit : null, raw);
+            attributes.Add(entry);
+            if (entry.Failing)
+            {
+                warnings |= HealthWarning.AttributeFailing;
+            }
+
             switch (id)
             {
                 case PowerOnHoursId:
@@ -184,14 +274,17 @@ public static class SmartParser
                 case AirflowTemperatureId:
                     airflow = Celsius(attribute[AttributeRaw]);
                     break;
-                case ReallocatedId when raw > 0:
-                    warnings |= HealthWarning.ReallocatedSectors;
+                case ReallocatedId:
+                    reallocated = raw & uint.MaxValue;
+                    warnings |= reallocated > 0 ? HealthWarning.ReallocatedSectors : HealthWarning.None;
                     break;
-                case PendingId when raw > 0:
-                    warnings |= HealthWarning.PendingSectors;
+                case PendingId:
+                    pending = raw & uint.MaxValue;
+                    warnings |= pending > 0 ? HealthWarning.PendingSectors : HealthWarning.None;
                     break;
-                case UncorrectableId when raw > 0:
-                    warnings |= HealthWarning.MediaErrors;
+                case UncorrectableId:
+                    uncorrectable = raw & uint.MaxValue;
+                    warnings |= uncorrectable > 0 ? HealthWarning.MediaErrors : HealthWarning.None;
                     break;
             }
 
@@ -209,7 +302,18 @@ public static class SmartParser
             warnings |= HealthWarning.WornOut;
         }
 
-        return new DriveHealth(table ? HealthSource.Ata : HealthSource.FailurePrediction, warnings, temperature ?? airflow, hours, life, null);
+        return new DriveHealth(
+            table ? HealthSource.Ata : HealthSource.FailurePrediction,
+            warnings,
+            temperature ?? airflow,
+            hours,
+            life,
+            null,
+            Protocol: HealthProtocol.Sata,
+            Attributes: table ? attributes : null,
+            ReallocatedSectors: reallocated,
+            PendingSectors: pending,
+            UncorrectableSectors: uncorrectable);
     }
 
     public static int? Celsius(int value) => value is > 0 and <= HighestCelsius || (value < 0 && value >= LowestCelsius) ? value : null;
@@ -233,6 +337,14 @@ public interface IHealthProbe
     int PredictFailure(out bool predicted, Span<byte> data);
 
     int ReadTemperature(out TemperatureFacts facts);
+
+    string? UsbParent => null;
+
+    int Command(ReadOnlySpan<byte> cdb, ScsiDirection direction, Span<byte> data, out ScsiReply reply)
+    {
+        reply = new ScsiReply(0, 0, []);
+        return VolumeNative.ErrorNotSupported;
+    }
 }
 
 public interface IDriveHealthSource
@@ -247,13 +359,38 @@ public static class DriveHealthReader
         ArgumentNullException.ThrowIfNull(volume);
         ArgumentNullException.ThrowIfNull(probe);
         DriveHealth? health = null;
+        UsbBridge? bridge = UsbBridge.Parse(probe.UsbParent);
+        bool bridged = bridge is not null || volume.Bus is StorageBus.Usb or StorageBus.Ieee1394;
+        string? model = null;
         Span<byte> buffer = stackalloc byte[VolumeNative.HealthLogBytes];
-        if (volume.Bus is StorageBus.Nvme or StorageBus.Unknown or StorageBus.Usb)
+        if (volume.Bus is StorageBus.Nvme or StorageBus.Unknown or StorageBus.Usb || bridged)
         {
             buffer.Clear();
             if (probe.ReadNvmeLog(buffer) == 0)
             {
                 health = SmartParser.FromNvme(buffer);
+            }
+        }
+
+        if (health is null && bridge is { CarriesNvme: true } nvme)
+        {
+            buffer.Clear();
+            if (BridgeReader.ReadNvmeHealth(probe, nvme.Kind, buffer))
+            {
+                health = SmartParser.FromNvme(buffer) is { } read ? read with { Source = HealthSource.NvmeBridge } : null;
+            }
+        }
+
+        if (health is null && bridge is not { CarriesNvme: true } && (bridged || volume.Bus is StorageBus.Scsi or StorageBus.Unknown))
+        {
+            if (BridgeReader.ReadSat(probe) is { } sat)
+            {
+                model = sat.Identity?.Model;
+                if (sat.Smart is { } smart)
+                {
+                    bool solid = sat.Identity?.IsSolidState == true || volume.Media == MediaKind.Ssd;
+                    health = SmartParser.FromAta(false, smart, solid, sat.Thresholds) with { Source = HealthSource.SatPassThrough };
+                }
             }
         }
 
@@ -263,6 +400,14 @@ public static class DriveHealthReader
             if (probe.PredictFailure(out bool predicted, buffer) == 0)
             {
                 health = SmartParser.FromAta(predicted, buffer, volume.Media == MediaKind.Ssd);
+                if (volume.Bus == StorageBus.Nvme)
+                {
+                    health = health with { Protocol = HealthProtocol.Nvme };
+                }
+                else if (volume.Bus is StorageBus.Scsi or StorageBus.Sas)
+                {
+                    health = health with { Protocol = HealthProtocol.Scsi };
+                }
             }
         }
 
@@ -280,7 +425,14 @@ public static class DriveHealthReader
             }
         }
 
-        return health ?? DriveHealth.Unavailable(volume);
+        health ??= DriveHealth.Unavailable(volume);
+        return health with
+        {
+            Bridged = bridged,
+            Bridge = bridge?.Name,
+            Model = health.Model ?? model,
+            Protocol = health.Protocol != HealthProtocol.Unknown ? health.Protocol : volume.Bus == StorageBus.Nvme ? HealthProtocol.Nvme : HealthProtocol.Unknown,
+        };
     }
 }
 
@@ -303,16 +455,57 @@ public sealed class SystemDriveHealth : IDriveHealthSource
 
         using (disk)
         {
-            return DriveHealthReader.Read(volume, new Probe(disk));
+            using var probe = new DiskProbe(volume.Letter, disk);
+            return DriveHealthReader.Read(volume, probe);
+        }
+    }
+}
+
+public sealed class DiskProbe(char letter, SafeFileHandle disk) : IHealthProbe, IDisposable
+{
+    private SafeFileHandle? _commands;
+    private bool _opened;
+    private string? _usb;
+    private bool _looked;
+
+    public string? UsbParent
+    {
+        get
+        {
+            if (!_looked)
+            {
+                _looked = true;
+                _usb = VolumeNative.TryGetDiskNumber(letter, out uint number) == 0 && VolumeNative.TryGetUsbParent(number, out string id) == 0 ? id : null;
+            }
+
+            return _usb;
         }
     }
 
-    private sealed class Probe(SafeFileHandle disk) : IHealthProbe
+    public int ReadNvmeLog(Span<byte> log) => VolumeNative.TryReadNvmeHealth(disk, log);
+
+    public int PredictFailure(out bool predicted, Span<byte> data) => VolumeNative.TryPredictFailure(disk, out predicted, data);
+
+    public int ReadTemperature(out TemperatureFacts facts) => VolumeNative.TryReadTemperature(disk, out facts);
+
+    public int Command(ReadOnlySpan<byte> cdb, ScsiDirection direction, Span<byte> data, out ScsiReply reply)
     {
-        public int ReadNvmeLog(Span<byte> log) => VolumeNative.TryReadNvmeHealth(disk, log);
+        reply = new ScsiReply(0, 0, []);
+        if (!_opened)
+        {
+            _opened = true;
+            if (VolumeNative.TryOpenDiskForCommands(letter, out SafeFileHandle commands) == 0)
+            {
+                _commands = commands;
+            }
+            else
+            {
+                commands.Dispose();
+            }
+        }
 
-        public int PredictFailure(out bool predicted, Span<byte> data) => VolumeNative.TryPredictFailure(disk, out predicted, data);
-
-        public int ReadTemperature(out TemperatureFacts facts) => VolumeNative.TryReadTemperature(disk, out facts);
+        return _commands is { } handle ? VolumeNative.TryScsiCommand(handle, cdb, direction, data, out reply) : VolumeNative.ErrorAccessDenied;
     }
+
+    public void Dispose() => _commands?.Dispose();
 }

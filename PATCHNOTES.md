@@ -2,6 +2,19 @@
 
 What changed in each release of Niskala Utilities, newest first.
 
+## v0.3.4 (2026-11-28)
+
+### Added
+
+- **USB S.M.A.R.T.** Health is now read through USB bridges with SAT and NVMe pass-through, including every attribute with its threshold.
+- **Scheduled optimization.** Weekly, monthly or idle upkeep through Windows Task Scheduler: TRIM for SSDs and Quick Defrag for hard disks.
+- **Richer cluster map.** MFT / metadata reserved areas and compressed files have their own colors in the map and the cluster inspector.
+
+### Improved
+
+- **Instant Drive Optimizer.** The page opens at once and checks each drive in the background, so a sleeping USB disk no longer holds it up.
+- **New layout.** A drive table with fragmentation, free-space fragments and a rating on top, and the Strategy Guide as a drawer on the right.
+
 ## v0.3.3 (2026-11-28)
 
 ### Added

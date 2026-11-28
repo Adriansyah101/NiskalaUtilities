@@ -11,6 +11,8 @@ public sealed class DriveMap
     private readonly long[] _owned;
     private readonly long[] _fragmented;
     private readonly long[] _archive;
+    private readonly long[] _reserved;
+    private readonly long[] _compressed;
     private long _version;
 
     public DriveMap(long clusters, int segments = DefaultSegments)
@@ -23,6 +25,8 @@ public sealed class DriveMap
         _owned = new long[Segments];
         _fragmented = new long[Segments];
         _archive = new long[Segments];
+        _reserved = new long[Segments];
+        _compressed = new long[Segments];
     }
 
     public long Clusters { get; }
@@ -68,6 +72,24 @@ public sealed class DriveMap
                 {
                     Spread(_archive, extent.Lcn, extent.Clusters, sign);
                 }
+                else if (state == ClusterState.Compressed)
+                {
+                    Spread(_compressed, extent.Lcn, extent.Clusters, sign);
+                }
+            }
+
+            _version++;
+        }
+    }
+
+    public void Reserve(IEnumerable<FreeRun> ranges)
+    {
+        ArgumentNullException.ThrowIfNull(ranges);
+        lock (_gate)
+        {
+            foreach (FreeRun range in ranges)
+            {
+                Spread(_reserved, range.Start, range.Length, 1);
             }
 
             _version++;
@@ -83,7 +105,7 @@ public sealed class DriveMap
             for (int cell = 0; cell < cells; cell++)
             {
                 (int first, int last) = CellSegments(cell, cells);
-                long total = 0, allocated = 0, owned = 0, fragmented = 0, archive = 0;
+                long total = 0, allocated = 0, owned = 0, fragmented = 0, archive = 0, reserved = 0, compressed = 0;
                 for (int segment = first; segment < last && segment < Segments; segment++)
                 {
                     (long start, long end) = Bounds(segment);
@@ -92,9 +114,11 @@ public sealed class DriveMap
                     owned += _owned[segment];
                     fragmented += _fragmented[segment];
                     archive += _archive[segment];
+                    reserved += _reserved[segment];
+                    compressed += _compressed[segment];
                 }
 
-                states[cell] = Pick(total, allocated, owned, fragmented, archive);
+                states[cell] = Pick(total, allocated, owned, fragmented, archive, reserved, compressed);
             }
         }
 
@@ -138,12 +162,24 @@ public sealed class DriveMap
         }
     }
 
-    internal static ClusterState Pick(long total, long allocated, long owned, long fragmented, long archive)
+    public (long Reserved, long Compressed) SpecialTotals()
+    {
+        lock (_gate)
+        {
+            return (_reserved.Sum(), _compressed.Sum());
+        }
+    }
+
+    internal static ClusterState Pick(long total, long allocated, long owned, long fragmented, long archive, long reserved = 0, long compressed = 0)
     {
         long free = Math.Max(0, total - allocated);
         long ownedInUse = Math.Min(owned, allocated);
-        long used = Math.Max(0, ownedInUse - fragmented - archive);
+        long used = Math.Max(0, ownedInUse - fragmented - archive - compressed);
         long system = Math.Max(0, allocated - ownedInUse);
+        long held = Math.Min(Math.Max(0, reserved), free + system);
+        long fromSystem = Math.Min(system, held);
+        system -= fromSystem;
+        free -= held - fromSystem;
         (ClusterState State, long Score)[] scores =
         [
             (ClusterState.Free, free),
@@ -151,6 +187,8 @@ public sealed class DriveMap
             (ClusterState.Fragmented, fragmented * FragmentedWeight),
             (ClusterState.Archive, archive),
             (ClusterState.System, system),
+            (ClusterState.MftReserved, held),
+            (ClusterState.Compressed, compressed),
         ];
         return scores.MaxBy(s => s.Score).State;
     }
@@ -207,5 +245,51 @@ public sealed class DriveMap
             counts[segment] += sign * take;
             start += take;
         }
+    }
+}
+
+public static class ReservedArea
+{
+    public static IReadOnlyList<FreeRun> Merge(IEnumerable<FreeRun> ranges, long clusters)
+    {
+        ArgumentNullException.ThrowIfNull(ranges);
+        var merged = new List<FreeRun>();
+        foreach (FreeRun range in ranges.Where(r => r.Length > 0).OrderBy(r => r.Start))
+        {
+            long start = Math.Clamp(range.Start, 0, clusters);
+            long end = Math.Clamp(range.End, start, clusters);
+            if (end <= start)
+            {
+                continue;
+            }
+
+            if (merged.Count > 0 && start <= merged[^1].End)
+            {
+                FreeRun last = merged[^1];
+                merged[^1] = new FreeRun(last.Start, Math.Max(last.End, end) - last.Start);
+            }
+            else
+            {
+                merged.Add(new FreeRun(start, end - start));
+            }
+        }
+
+        return merged;
+    }
+
+    public static long Overlap(IReadOnlyList<FreeRun> ranges, long start, long end)
+    {
+        ArgumentNullException.ThrowIfNull(ranges);
+        long total = 0;
+        foreach (FreeRun range in ranges)
+        {
+            long overlap = Math.Min(range.End, end) - Math.Max(range.Start, start);
+            if (overlap > 0)
+            {
+                total += overlap;
+            }
+        }
+
+        return total;
     }
 }

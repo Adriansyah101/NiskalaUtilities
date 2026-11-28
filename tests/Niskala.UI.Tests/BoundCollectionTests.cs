@@ -28,7 +28,7 @@ public sealed class BoundCollectionTests
                 typeof(CleanRuleRowCollection), typeof(HindranceRowCollection), typeof(IssueRowCollection),
                 typeof(ResourceRowCollection), typeof(SuspendRowCollection), typeof(DriveRowCollection),
                 typeof(FragmentRowCollection), typeof(SummaryRowCollection),
-                typeof(StrategyRowCollection), typeof(OccupantRowCollection),
+                typeof(StrategyRowCollection), typeof(OccupantRowCollection), typeof(AttributeRowCollection),
                 typeof(RepairRowCollection), typeof(LogLineCollection),
                 typeof(TransactionItemCollection), typeof(PaletteEntryCollection), typeof(NoteRowCollection),
                 typeof(NavCategoryCollection), typeof(NavPageCollection),

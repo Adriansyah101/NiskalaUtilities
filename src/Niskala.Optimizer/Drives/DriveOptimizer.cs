@@ -69,13 +69,34 @@ public sealed class DriveTrimmer(IVolumeSystem system)
         progress?.Report(new DriveProgress(DrivePhase.Trimming, Math.Clamp(percent, 0, 100), volume.Name, 0, null));
 }
 
-public sealed class DriveOptimizer(IVolumeSystem system, VolumeAnalysisCache? cache = null, IDriveHealthSource? health = null)
+public sealed class DriveOptimizer(IVolumeSystem system, VolumeAnalysisCache? cache = null, IDriveHealthSource? health = null, VolumeMediaCache? media = null)
 {
     public const string WorkerName = "Niskala drive optimizer";
 
     public VolumeAnalysisCache Cache { get; } = cache ?? new VolumeAnalysisCache();
 
+    public VolumeMediaCache Media { get; } = media ?? new VolumeMediaCache();
+
     public IReadOnlyList<DriveVolume> Volumes() => system.FixedVolumes();
+
+    public IReadOnlyList<DriveVolume> ListVolumes()
+    {
+        IReadOnlyList<DriveVolume> volumes = system.ListVolumes();
+        Media.Prune(volumes);
+        return [.. volumes.Select(v => !v.Probed && Media.TryGetMedia(v, out MediaProbe probe) ? probe.ApplyTo(v) : v)];
+    }
+
+    public async Task<DriveVolume> ProbeAsync(DriveVolume volume)
+    {
+        ArgumentNullException.ThrowIfNull(volume);
+        if (volume.Probed)
+        {
+            return volume;
+        }
+
+        MediaProbe probe = await Media.Media(volume, system.ProbeMedia).ConfigureAwait(false);
+        return probe.ApplyTo(volume);
+    }
 
     public DriveAnalysis? Cached(DriveVolume volume) => Cache.Find(volume);
 
@@ -84,7 +105,7 @@ public sealed class DriveOptimizer(IVolumeSystem system, VolumeAnalysisCache? ca
         ArgumentNullException.ThrowIfNull(volume);
         return health is null
             ? Task.FromResult(DriveHealth.Unavailable(volume))
-            : Task.Run(() => health.Read(volume), cancellationToken);
+            : Media.Health(volume, health.Read).WaitAsync(cancellationToken);
     }
 
     public Task<DriveAnalysis> AnalyzeAsync(DriveVolume volume, IProgress<DriveProgress>? progress, CancellationToken cancellationToken) =>

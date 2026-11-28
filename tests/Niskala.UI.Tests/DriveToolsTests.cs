@@ -92,8 +92,9 @@ public sealed class DriveToolsTests
         Strings strings = Strings.For(indonesian);
         Assert.All(Enum.GetValues<HealthWarning>().Where(w => w != HealthWarning.None), w => Assert.False(string.IsNullOrWhiteSpace(strings.HealthWarningName(w))));
         Assert.Equal(3, Enum.GetValues<HealthStatus>().Select(strings.HealthStatusName).Distinct().Count());
-        Assert.Equal(5, Enum.GetValues<HealthSource>().Select(strings.HealthSourceName).Distinct().Count());
-        Assert.Equal(4, Enum.GetValues<OccupantState>().Select(strings.OccupantName).Distinct().Count());
+        Assert.Equal(7, Enum.GetValues<HealthSource>().Select(strings.HealthSourceName).Distinct().Count());
+        Assert.Equal(5, Enum.GetValues<OccupantState>().Select(strings.OccupantName).Distinct().Count());
+        Assert.Equal(strings.LegendCompressed, strings.OccupantName(OccupantState.Compressed));
         Assert.Equal(strings.LegendSystem, strings.OccupantName(OccupantState.SystemLocked));
         Assert.Equal(3, Enum.GetValues<QueueSkipReason>().Where(r => r != QueueSkipReason.None).Select(strings.QueueSkipName).Distinct().Count());
     }
@@ -127,13 +128,10 @@ public sealed class DriveToolsTests
     }
 
     [Theory]
-    [InlineData(true, DriveOptimizerViewModel.TabFragments)]
-    [InlineData(false, DriveOptimizerViewModel.TabSummary)]
-    public void Leaving_a_drive_closes_its_inspector_tab(bool isHdd, int expected)
-    {
-        Assert.Equal(expected, DriveOptimizerViewModel.TabFor(true, isHdd, DriveOptimizerViewModel.TabInspector));
-        Assert.Equal(expected, DriveOptimizerViewModel.TabFor(false, isHdd, DriveOptimizerViewModel.TabInspector));
-    }
+    [InlineData(true, DriveOptimizerViewModel.TabMap)]
+    [InlineData(false, DriveOptimizerViewModel.TabMap)]
+    public void The_cluster_map_stays_open_on_every_kind_of_drive(bool isHdd, int expected) =>
+        Assert.Equal(expected, DriveOptimizerViewModel.TabFor(isHdd, DriveOptimizerViewModel.TabMap));
 
     [Fact]
     public void A_click_on_the_map_lands_on_the_cell_under_the_pointer()
@@ -175,9 +173,10 @@ public sealed class DriveToolsTests
         Assert.Contains("IsChecked=\"{x:Bind ViewModel.IsGuideOpen, Mode=TwoWay}\"", page, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{x:Bind ViewModel.Strategies}\"", page, StringComparison.Ordinal);
         Assert.Contains("Command=\"{x:Bind Apply}\"", page, StringComparison.Ordinal);
-        Assert.Contains("Visibility=\"{x:Bind services:Format.Visible(ViewModel.GuideShowsTrim), Mode=OneWay}\"", page, StringComparison.Ordinal);
+        Assert.Contains("Click=\"OnApplyGuide\"", page, StringComparison.Ordinal);
         Assert.Contains("HighlightBrush=\"{ThemeResource NiskalaAccentBrush}\"", page, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"InspectorTab\"", page, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MapTab\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"InspectorTab\"", page, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{x:Bind ViewModel.Occupants}\"", page, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{x:Bind ViewModel.Health}\"", page, StringComparison.Ordinal);
         Assert.DoesNotContain("{Binding", page, StringComparison.Ordinal);
@@ -196,7 +195,7 @@ public sealed class DriveToolsTests
         Assert.Contains("DriveQueue.Plan(rows.Select(r => r.Volume), kind, Mode)", model, StringComparison.Ordinal);
         Assert.Contains("new DriveQueueRunner(_optimizer.Value).RunAsync(steps, new QueueSink(this), token)", model, StringComparison.Ordinal);
         Assert.Contains("if (IsRunning || Selected?.Volume.CanRelocate != true)", model, StringComparison.Ordinal);
-        Assert.Contains("_optimizer.Value.ReadHealthAsync(row.Volume, CancellationToken.None)", model, StringComparison.Ordinal);
+        Assert.Contains("_loader.Value.ProbeAllAsync(volumes, update => _services.Post(() => ApplyProbe(ask, update)), token)", model, StringComparison.Ordinal);
         Assert.Contains("await Task.Run(() => ClusterInspector.Inspect(analysis, start, end))", model, StringComparison.Ordinal);
     }
 }

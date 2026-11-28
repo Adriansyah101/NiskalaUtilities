@@ -126,7 +126,7 @@ public static class TaskSchedulerNative
         }
     }
 
-    public static unsafe int TryRegister(string path, string xml)
+    public static unsafe int TryRegister(string path, string xml, bool replace = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         ArgumentException.ThrowIfNullOrEmpty(xml);
@@ -153,7 +153,7 @@ public static class TaskSchedulerNative
 
             principal = definition->Principal;
             using SysFreeStringSafeHandle taskName = PInvoke.SysAllocString(name);
-            folder->RegisterTaskDefinition(taskName, definition, (int)TASK_CREATION.TASK_CREATE, default, default, principal->LogonType, default, &task);
+            folder->RegisterTaskDefinition(taskName, definition, (int)(replace ? TASK_CREATION.TASK_CREATE_OR_UPDATE : TASK_CREATION.TASK_CREATE), default, default, principal->LogonType, default, &task);
             return 0;
         }
         catch (Exception ex) when (IsFailure(ex))
@@ -165,6 +165,37 @@ public static class TaskSchedulerNative
             Release(task);
             Release(principal);
             Release(definition);
+            Release(folder);
+            Release(service);
+        }
+    }
+
+    public static unsafe int TryGetNextRun(string path, out DateTime? next)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        next = null;
+        using ComScope com = ComScope.Enter();
+        ITaskService* service = null;
+        ITaskFolder* folder = null;
+        IRegisteredTask* task = null;
+        try
+        {
+            int error = TryOpenTask(path, out service, out folder, out task);
+            if (error == 0)
+            {
+                double date = task->NextRunTime;
+                next = date > 0 ? DateTime.FromOADate(date) : null;
+            }
+
+            return error;
+        }
+        catch (Exception ex) when (IsFailure(ex))
+        {
+            return Normalized(ex.HResult);
+        }
+        finally
+        {
+            Release(task);
             Release(folder);
             Release(service);
         }

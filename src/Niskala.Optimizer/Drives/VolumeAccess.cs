@@ -7,7 +7,7 @@ using Niskala.Interop.Volumes;
 
 namespace Niskala.Optimizer.Drives;
 
-public readonly record struct VolumeEntry(string Name, bool IsDirectory, bool IsReparsePoint, long Size, DateTime LastWriteUtc);
+public readonly record struct VolumeEntry(string Name, bool IsDirectory, bool IsReparsePoint, long Size, DateTime LastWriteUtc, bool IsCompressed = false);
 
 public interface IFileMover : IDisposable
 {
@@ -37,11 +37,32 @@ public interface IVolumeSession : IDisposable
     IoSample? SampleIo();
 
     int TrimFreeSpace(long bytes, long chunk, Action<long> trimmed, CancellationToken cancellationToken);
+
+    int ReadReserved(List<FreeRun> reserved) => VolumeNative.ErrorNotSupported;
+}
+
+public sealed record MediaProbe(MediaKind Media, bool TrimSupported, StorageBus Bus, int RotationRate)
+{
+    public static MediaProbe Of(DriveVolume volume)
+    {
+        ArgumentNullException.ThrowIfNull(volume);
+        return new MediaProbe(volume.Media, volume.TrimSupported, volume.Bus, volume.RotationRate);
+    }
+
+    public DriveVolume ApplyTo(DriveVolume volume)
+    {
+        ArgumentNullException.ThrowIfNull(volume);
+        return volume with { Media = Media, TrimSupported = TrimSupported, Bus = Bus, RotationRate = RotationRate, Probed = true };
+    }
 }
 
 public interface IVolumeSystem
 {
     IReadOnlyList<DriveVolume> FixedVolumes();
+
+    IReadOnlyList<DriveVolume> ListVolumes() => FixedVolumes();
+
+    MediaProbe ProbeMedia(DriveVolume volume) => MediaProbe.Of(volume);
 
     int TryOpen(DriveVolume volume, out IVolumeSession? session);
 
@@ -110,7 +131,9 @@ public sealed class SystemVolumes : IVolumeSystem
 
     public static SystemVolumes Instance { get; } = new();
 
-    public IReadOnlyList<DriveVolume> FixedVolumes()
+    public IReadOnlyList<DriveVolume> FixedVolumes() => [.. ListVolumes().Select(v => ProbeMedia(v).ApplyTo(v))];
+
+    public IReadOnlyList<DriveVolume> ListVolumes()
     {
         var volumes = new List<DriveVolume>();
         foreach (char letter in VolumeNative.FixedDrives())
@@ -118,25 +141,6 @@ public sealed class SystemVolumes : IVolumeSystem
             if (VolumeNative.TryGetFacts(letter, out VolumeFacts facts) != 0)
             {
                 continue;
-            }
-
-            MediaEvidence evidence = MediaEvidence.None;
-            bool trim = false;
-            if (VolumeNative.TryOpenVolume(letter, readData: false, out SafeFileHandle handle) == 0)
-            {
-                using (handle)
-                {
-                    bool? seekPenalty = VolumeNative.TryQuerySeekPenalty(handle, out bool seek) == 0 ? seek : null;
-                    trim = VolumeNative.TryQueryTrim(handle, out bool enabled) == 0 && enabled;
-                    evidence = VolumeNative.TryQueryDevice(handle, out StorageDeviceFacts device) == 0
-                        ? new MediaEvidence(seekPenalty, (StorageBus)device.BusType, MediaClassifier.RotationNotReported, $"{device.Vendor} {device.Product}".Trim())
-                        : evidence with { SeekPenalty = seekPenalty };
-                }
-            }
-
-            if (MediaClassifier.WantsRotationRate(evidence) && VolumeNative.TryQueryRotationRate(letter, out int rotationRate) == 0)
-            {
-                evidence = evidence with { RotationRate = rotationRate };
             }
 
             volumes.Add(new DriveVolume(
@@ -147,14 +151,65 @@ public sealed class SystemVolumes : IVolumeSystem
                 facts.TotalClusters,
                 facts.TotalBytes,
                 facts.FreeBytes,
-                MediaClassifier.Classify(evidence),
-                trim,
-                evidence.Bus,
-                evidence.RotationRate,
-                facts.SerialNumber));
+                MediaKind.Unknown,
+                false,
+                SerialNumber: facts.SerialNumber,
+                Probed: false));
         }
 
         return volumes;
+    }
+
+    public MediaProbe ProbeMedia(DriveVolume volume)
+    {
+        ArgumentNullException.ThrowIfNull(volume);
+        char letter = volume.Letter;
+        MediaEvidence evidence = MediaEvidence.None;
+        bool trim = false;
+        if (VolumeNative.TryOpenVolume(letter, readData: false, out SafeFileHandle handle) == 0)
+        {
+            using (handle)
+            {
+                bool? seekPenalty = VolumeNative.TryQuerySeekPenalty(handle, out bool seek) == 0 ? seek : null;
+                trim = VolumeNative.TryQueryTrim(handle, out bool enabled) == 0 && enabled;
+                evidence = VolumeNative.TryQueryDevice(handle, out StorageDeviceFacts device) == 0
+                    ? new MediaEvidence(seekPenalty, (StorageBus)device.BusType, MediaClassifier.RotationNotReported, $"{device.Vendor} {device.Product}".Trim())
+                    : evidence with { SeekPenalty = seekPenalty };
+            }
+        }
+        else
+        {
+            handle.Dispose();
+        }
+
+        if (MediaClassifier.WantsRotationRate(evidence))
+        {
+            if (VolumeNative.TryQueryRotationRate(letter, out int rotationRate) == 0 && rotationRate != MediaClassifier.RotationNotReported)
+            {
+                evidence = evidence with { RotationRate = rotationRate };
+            }
+            else if (MediaClassifier.IsBridged(evidence.Bus) && IdentifyThroughBridge(letter) is { } identity)
+            {
+                evidence = evidence with { RotationRate = identity.RotationRate, Device = string.IsNullOrWhiteSpace(evidence.Device) ? identity.Model : evidence.Device };
+            }
+        }
+
+        return new MediaProbe(MediaClassifier.Classify(evidence), trim, evidence.Bus, evidence.RotationRate);
+    }
+
+    private static AtaIdentity? IdentifyThroughBridge(char letter)
+    {
+        if (VolumeNative.TryOpenDisk(letter, out SafeFileHandle disk) != 0)
+        {
+            disk.Dispose();
+            return null;
+        }
+
+        using (disk)
+        {
+            using var probe = new DiskProbe(letter, disk);
+            return UsbBridge.Parse(probe.UsbParent) is { CarriesNvme: true } ? null : BridgeReader.ReadSat(probe, smart: false)?.Identity;
+        }
     }
 
     public int TryOpen(DriveVolume volume, out IVolumeSession? session)
@@ -256,7 +311,8 @@ public sealed class SystemVolumes : IVolumeSystem
                     entry.Attributes.HasFlag(FileAttributes.Directory),
                     entry.Attributes.HasFlag(FileAttributes.ReparsePoint),
                     entry.Size,
-                    entry.LastWriteUtc));
+                    entry.LastWriteUtc,
+                    entry.Attributes.HasFlag(FileAttributes.Compressed)));
             }
 
             return error;
@@ -386,6 +442,33 @@ public sealed class SystemVolumes : IVolumeSystem
 
                 return 0;
             }
+        }
+
+        public int ReadReserved(List<FreeRun> reserved)
+        {
+            ArgumentNullException.ThrowIfNull(reserved);
+            if (!FileTableScan.Supports(volume))
+            {
+                return VolumeNative.ErrorNotSupported;
+            }
+
+            int error = VolumeNative.TryGetNtfsLayout(handle, out NtfsLayout layout);
+            if (error != 0)
+            {
+                return error;
+            }
+
+            if (layout.MftZoneEnd > layout.MftZoneStart)
+            {
+                reserved.Add(new FreeRun(layout.MftZoneStart, layout.MftZoneEnd - layout.MftZoneStart));
+            }
+
+            if (layout.MftClusters > 0)
+            {
+                reserved.Add(new FreeRun(layout.MftStartLcn, layout.MftClusters));
+            }
+
+            return 0;
         }
 
         public void Dispose()
