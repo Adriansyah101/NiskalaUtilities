@@ -33,7 +33,13 @@ public sealed partial class Strings
     public string PalettePlaceholder => T("Type an app name or a command…", "Ketik nama aplikasi atau perintah…");
     public string ThemeLight => T("Light theme", "Tema terang");
     public string ThemeDark => T("Dark theme", "Tema gelap");
-    public string SwitchLanguage => T("Bahasa Indonesia", "English");
+    public string LanguageName => T("English", "Bahasa Indonesia");
+    public string SwitchLanguageHint => T("Switch to Bahasa Indonesia", "Ganti ke bahasa Inggris (English)");
+    public string HistoryDuplicates => T("Duplicate files", "Berkas duplikat");
+
+    public string ThemeName(bool light) => light ? ThemeLight : ThemeDark;
+
+    public string SwitchThemeHint(bool light) => light ? T("Switch to the dark theme", "Ganti ke tema gelap") : T("Switch to the light theme", "Ganti ke tema terang");
 
     public string NavApps => T("Apps", "Aplikasi");
     public string NavTracker => T("Install Tracker", "Pemantau Instalasi");
@@ -538,7 +544,7 @@ public sealed partial class Strings
         Niskala.Guardian.Journal.TransactionKind.SystemClean => T("System cleanup", "Pembersihan sistem"),
         Niskala.Guardian.Journal.TransactionKind.RegistryIntegrity => NavRegistry,
         Niskala.Guardian.Journal.TransactionKind.ResourceControl => NavResources,
-        Niskala.Guardian.Journal.TransactionKind.DuplicateClean => NavDuplicates,
+        Niskala.Guardian.Journal.TransactionKind.DuplicateClean => HistoryDuplicates,
         _ => T("Install rollback", "Rollback instalasi"),
     };
 

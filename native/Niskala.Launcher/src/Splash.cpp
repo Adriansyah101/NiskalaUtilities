@@ -3,6 +3,7 @@
 #include <d2d1.h>
 #include <dwmapi.h>
 #include <dwrite_1.h>
+#include <shellscalingapi.h>
 #include <wrl/client.h>
 
 #include <algorithm>
@@ -32,6 +33,7 @@ namespace
     constexpr float MiterLimit = 4.0f;
     constexpr float LayoutRoom = 4096.0f;
     constexpr float BaseDpi = 96.0f;
+    constexpr float WorkAreaShare = 0.9f;
     constexpr UINT32 TopColor = 0x183D66;
     constexpr UINT32 BottomColor = 0x08111E;
     constexpr UINT32 SubtitleColor = 0xC4D6E8;
@@ -48,6 +50,26 @@ namespace
     double Clamp01(double value)
     {
         return std::clamp(value, 0.0, 1.0);
+    }
+
+    float MonitorScale(HMONITOR monitor, HWND window)
+    {
+        UINT dpiX = 0;
+        UINT dpiY = 0;
+        if (SUCCEEDED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY)) && dpiX != 0)
+        {
+            return static_cast<float>(dpiX) / BaseDpi;
+        }
+
+        const UINT dpi = GetDpiForWindow(window);
+        return static_cast<float>(dpi == 0 ? USER_DEFAULT_SCREEN_DPI : dpi) / BaseDpi;
+    }
+
+    float FitScale(float scale, const RECT& work)
+    {
+        const float roomX = static_cast<float>(work.right - work.left) * WorkAreaShare / CardWidth;
+        const float roomY = static_cast<float>(work.bottom - work.top) * WorkAreaShare / CardHeight;
+        return std::max(0.5f, std::min({scale, roomX, roomY}));
     }
 
     double EaseOut(double t)
@@ -155,7 +177,8 @@ namespace
                 return false;
             }
 
-            const HMONITOR monitor = MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+            POINT cursor{};
+            const HMONITOR monitor = GetCursorPos(&cursor) ? MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST) : MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
             MONITORINFO info{};
             info.cbSize = sizeof(info);
             if (!GetMonitorInfoW(monitor, &info))
@@ -181,7 +204,7 @@ namespace
                 return false;
             }
 
-            _scale = static_cast<float>(GetDpiForWindow(_window)) / BaseDpi;
+            _scale = FitScale(MonitorScale(monitor, _window), info.rcWork);
             _size.cx = static_cast<LONG>(std::lround(CardWidth * _scale));
             _size.cy = static_cast<LONG>(std::lround(CardHeight * _scale));
             _position.x = info.rcWork.left + ((info.rcWork.right - info.rcWork.left - _size.cx) / 2);

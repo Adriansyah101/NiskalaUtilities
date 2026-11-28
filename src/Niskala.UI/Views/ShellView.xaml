@@ -150,7 +150,7 @@
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
-    <Grid x:Name="Pane" Padding="8,6,8,8" RowSpacing="6">
+    <Grid x:Name="Pane" Padding="8,6,8,8" RowSpacing="{x:Bind Nav.PaneSpacing, Mode=OneWay}">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
@@ -172,13 +172,14 @@
               <StackPanel>
                 <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="{x:Bind Glyph}" Label="{x:Bind Title, Mode=OneWay}" FontWeight="SemiBold"
                                  TrailingGlyph="{x:Bind Chevron, Mode=OneWay}" IsActive="{x:Bind IsActive, Mode=OneWay}" IsOpen="{x:Bind IsOpen, Mode=OneWay}"
-                                 IsCompact="{x:Bind IsCompact, Mode=OneWay}" Click="OnCategoryClick" />
+                                 IsCompact="{x:Bind IsCompact, Mode=OneWay}" Height="{x:Bind ButtonHeight, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Title, Mode=OneWay}"
+                                 Click="OnCategoryClick" />
                 <views:Accordion IsExpanded="{x:Bind ShowPages, Mode=OneWay}">
                   <ItemsControl ItemsSource="{x:Bind Pages}" Margin="19,2,0,4" IsTabStop="False">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:NavPage">
                         <views:NavButton Style="{StaticResource NavPageStyle}" Glyph="{x:Bind Glyph}" Label="{x:Bind Title, Mode=OneWay}"
-                                         IsActive="{x:Bind IsSelected, Mode=OneWay}" Click="OnPageClick" />
+                                         IsActive="{x:Bind IsSelected, Mode=OneWay}" Height="{x:Bind ButtonHeight, Mode=OneWay}" Click="OnPageClick" />
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
@@ -193,12 +194,17 @@
         <Grid>
           <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="{x:Bind Nav.Updates.Glyph}" Label="{x:Bind Nav.Updates.Title, Mode=OneWay}"
                            IsActive="{x:Bind Nav.Updates.IsSelected, Mode=OneWay}" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Click="OnUpdatesClick"
+                           Height="{x:Bind Nav.Updates.ButtonHeight, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Nav.Updates.Title, Mode=OneWay}"
                            IsEnabled="{x:Bind Nav.IsUnlocked, Mode=OneWay}" />
           <InfoBadge Style="{ThemeResource AttentionDotInfoBadgeStyle}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="26,7,0,0" IsHitTestVisible="False"
                      Visibility="{x:Bind services:Format.Visible(Updates.IsAvailable), Mode=OneWay}" />
         </Grid>
-        <views:NavButton x:Name="ThemeButton" Style="{StaticResource NavButtonStyle}" Glyph="&#xE706;" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Click="OnThemeClick" />
-        <views:NavButton Style="{StaticResource NavButtonStyle}" Glyph="&#xE774;" Label="{x:Bind S.SwitchLanguage}" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Click="OnLanguageClick" />
+        <views:NavButton x:Name="ThemeButton" Style="{StaticResource NavButtonStyle}" Glyph="{x:Bind Nav.ThemeGlyph, Mode=OneWay}" Label="{x:Bind Nav.ThemeLabel, Mode=OneWay}"
+                         TrailingGlyph="&#xE8AB;" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Height="{x:Bind Nav.CategoryButtonHeight, Mode=OneWay}"
+                         ToolTipService.ToolTip="{x:Bind Nav.ThemeHint, Mode=OneWay}" AutomationProperties.HelpText="{x:Bind Nav.ThemeHint, Mode=OneWay}" Click="OnThemeClick" />
+        <views:NavButton x:Name="LanguageButton" Style="{StaticResource NavButtonStyle}" Glyph="&#xE774;" Label="{x:Bind Nav.LanguageLabel, Mode=OneWay}"
+                         TrailingGlyph="&#xE8AB;" IsCompact="{x:Bind Nav.IsCompact, Mode=OneWay}" Height="{x:Bind Nav.CategoryButtonHeight, Mode=OneWay}"
+                         ToolTipService.ToolTip="{x:Bind Nav.LanguageHint, Mode=OneWay}" AutomationProperties.HelpText="{x:Bind Nav.LanguageHint, Mode=OneWay}" Click="OnLanguageClick" />
       </StackPanel>
     </Grid>
 

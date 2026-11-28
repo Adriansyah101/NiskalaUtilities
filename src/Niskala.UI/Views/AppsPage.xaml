@@ -31,8 +31,8 @@
 
         <Grid ColumnSpacing="10">
           <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="3*" />
+            <ColumnDefinition Width="2*" MinWidth="160" MaxWidth="300" />
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
@@ -40,7 +40,7 @@
             <TextBlock Text="{x:Bind ViewModel.S.AppsTitle}" Style="{StaticResource PageTitleStyle}" />
             <TextBlock Text="{x:Bind ViewModel.Summary, Mode=OneWay}" Style="{StaticResource CaptionMutedStyle}" />
           </StackPanel>
-          <TextBox Grid.Column="1" Width="260" VerticalAlignment="Center" PlaceholderText="{x:Bind ViewModel.S.AppsSearch}"
+          <TextBox Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" PlaceholderText="{x:Bind ViewModel.S.AppsSearch}"
                    Text="{x:Bind ViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
           <DropDownButton Grid.Column="2" VerticalAlignment="Center" Content="{x:Bind ViewModel.S.SortBy}">
             <DropDownButton.Flyout>

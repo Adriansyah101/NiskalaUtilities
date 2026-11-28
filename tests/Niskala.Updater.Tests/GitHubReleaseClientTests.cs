@@ -16,7 +16,7 @@ public sealed class GitHubReleaseClientTests
     }
 
     [Fact]
-    public async Task A_newer_release_is_available_with_its_four_assets()
+    public async Task A_newer_release_is_available_with_its_installer_and_checksums()
     {
         (UpdateCheck check, _) = await CheckAsync(Releases.Json());
 
@@ -29,9 +29,8 @@ public sealed class GitHubReleaseClientTests
         Assert.Equal("https://github.com/Adriansyah101/NiskalaUtilities/releases/tag/v0.2.0", check.Page?.AbsoluteUri);
         Assert.Equal("NiskalaUtilities-Setup-v0.2.0-win-x64.exe", check.Assets.Installer?.Name);
         Assert.Equal(4, check.Assets.Installer?.Size);
-        Assert.Equal("NiskalaUtilities-v0.2.0-win-x64.zip", check.Assets.Portable?.Name);
-        Assert.Equal("NiskalaUtilities-CLI-v0.2.0-win-x64.zip", check.Assets.Cli?.Name);
         Assert.Equal(Releases.Base + "SHA256SUMS.txt", check.Assets.Checksums?.DownloadUrl.AbsoluteUri);
+        Assert.True(check.Assets.IsComplete);
     }
 
     [Fact]
@@ -119,14 +118,32 @@ public sealed class GitHubReleaseClientTests
         Assert.Equal("v0.2.0", release?.TagName);
     }
 
-    [Theory]
-    [InlineData(InstallMode.Installed, UpdateProduct.Desktop, "NiskalaUtilities-Setup-v0.2.0-win-x64.exe")]
-    [InlineData(InstallMode.Installed, UpdateProduct.CommandLine, "NiskalaUtilities-Setup-v0.2.0-win-x64.exe")]
-    [InlineData(InstallMode.Portable, UpdateProduct.Desktop, "NiskalaUtilities-v0.2.0-win-x64.zip")]
-    [InlineData(InstallMode.Portable, UpdateProduct.CommandLine, "NiskalaUtilities-CLI-v0.2.0-win-x64.zip")]
-    public async Task Each_copy_gets_its_own_package(InstallMode mode, UpdateProduct product, string expected)
+    [Fact]
+    public async Task The_installer_for_this_runtime_is_the_only_package()
     {
         (UpdateCheck check, _) = await CheckAsync(Releases.Json());
-        Assert.Equal(expected, check.Assets.For(mode, product)?.Name);
+        Assert.Equal("NiskalaUtilities-Setup-v0.2.0-win-x64.exe", UpdateService.PackageFor(check)?.Name);
+        Assert.DoesNotContain(typeof(ReleaseAssets).GetProperties(), p => p.Name is "Portable" or "Cli");
     }
+
+    [Fact]
+    public async Task A_release_with_only_archives_is_incomplete()
+    {
+        (UpdateCheck check, _) = await CheckAsync(Only("NiskalaUtilities-v0.2.0-win-x64.zip", "NiskalaUtilities-CLI-v0.2.0-win-x64.zip", "SHA256SUMS.txt"));
+        Assert.Equal(UpdateStatus.Available, check.Status);
+        Assert.Null(check.Assets.Installer);
+        Assert.False(check.Assets.IsComplete);
+        Assert.Null(UpdateService.PackageFor(check));
+    }
+
+    [Fact]
+    public async Task A_release_with_the_installer_and_checksums_needs_nothing_else()
+    {
+        (UpdateCheck check, _) = await CheckAsync(Only("NiskalaUtilities-Setup-v0.2.0-win-x64.exe", "SHA256SUMS.txt"));
+        Assert.True(check.Assets.IsComplete);
+        Assert.False((await CheckAsync(Only("NiskalaUtilities-Setup-v0.2.0-win-x64.exe"))).Check.Assets.IsComplete);
+    }
+
+    private static string Only(params string[] names) =>
+        $$"""{ "tag_name": "v0.2.0", "assets": [{{string.Join(", ", names.Select(n => $$"""{ "name": "{{n}}", "size": 1, "browser_download_url": "{{Releases.Base}}{{n}}" }"""))}}] }""";
 }

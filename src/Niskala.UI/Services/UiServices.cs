@@ -18,9 +18,7 @@ public enum Section
     Registry,
     Resources,
     Suspend,
-    Storage,
-    Duplicates,
-    Wipe,
+    Drives,
     Repair,
     History,
     Updates,
@@ -48,9 +46,7 @@ public sealed class UiServices : IDisposable
         Integrity = new IntegrityViewModel(this);
         Resources = new ResourcesViewModel(this);
         Suspend = new SuspendViewModel(this);
-        Storage = new StorageViewModel(this);
-        Duplicates = new DuplicatesViewModel(this);
-        Wipe = new WipeViewModel(this);
+        Drives = new DriveOptimizerViewModel(this);
         Repair = new RepairViewModel(this);
         History = new HistoryViewModel(this);
         Updates = new UpdatesViewModel(this);
@@ -94,11 +90,7 @@ public sealed class UiServices : IDisposable
 
     public SuspendViewModel Suspend { get; }
 
-    public StorageViewModel Storage { get; }
-
-    public DuplicatesViewModel Duplicates { get; }
-
-    public WipeViewModel Wipe { get; }
+    public DriveOptimizerViewModel Drives { get; }
 
     public CleanRuleCatalog Catalog => _catalog ??= Host.LoadRuleCatalog();
 
@@ -113,8 +105,8 @@ public sealed class UiServices : IDisposable
     public NavigationViewModel Navigation { get; } = new();
 
     public bool IsBusy =>
-        Apps.Inspector.IsBusy || Apps.Inspector.ShowScrim || Repair.IsRunning || Tracker.IsRecording || Tracker.IsBusy || Updates.IsDownloading ||
-        ((TaskViewModel[])[QuickScan, SelectiveClean, Integrity, Resources, Suspend, Storage, Duplicates, Wipe]).Any(t => t.IsBusy);
+        Apps.Inspector.IsBusy || Apps.Inspector.ShowScrim || Repair.IsRunning || Drives.IsRunning || Tracker.IsRecording || Tracker.IsBusy || Updates.IsDownloading ||
+        ((TaskViewModel[])[QuickScan, SelectiveClean, Integrity, Resources, Suspend]).Any(t => t.IsBusy);
 
     public bool Navigate(Section section) => Navigation.Select(section);
 
@@ -131,17 +123,19 @@ public sealed class UiServices : IDisposable
         Navigation.Relabel(Strings.Current);
         Apps.Relabel();
         Resources.UpdateSummary();
+        Drives.Relabel();
         Updates.Relabel();
     }
 
     public void Dispose()
     {
-        foreach (TaskViewModel page in (TaskViewModel[])[QuickScan, SelectiveClean, Integrity, Resources, Suspend, Storage, Duplicates, Wipe])
+        foreach (TaskViewModel page in (TaskViewModel[])[QuickScan, SelectiveClean, Integrity, Resources, Suspend])
         {
             page.Dispose();
         }
 
         Repair.Dispose();
+        Drives.Dispose();
         Updates.Dispose();
         Apps.Dispose();
         _extractor.Dispose();

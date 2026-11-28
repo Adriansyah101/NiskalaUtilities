@@ -30,12 +30,11 @@ public sealed partial class Strings
 
     public string UpdateOpenPage => T("Open on GitHub", "Buka di GitHub");
     public string UpdateRestart => T("Update & restart", "Perbarui & Mulai Ulang");
-    public string UpdateSavePackage => T("Download the new package", "Unduh paket baru");
     public string UpdateChecking => T("Checking GitHub…", "Memeriksa GitHub…");
     public string UpdateNotChecked => T("Not checked: GitHub could not be reached.", "Belum diperiksa: GitHub tidak terjangkau.");
     public string UpdateIncomplete => T(
-        "The release lacks this copy's package or SHA256SUMS.txt, so it cannot be verified.",
-        "Rilis ini tidak memuat paket untuk salinan ini atau SHA256SUMS.txt, jadi tidak bisa diverifikasi.");
+        "The release lacks its installer or SHA256SUMS.txt, so it cannot be verified.",
+        "Rilis ini tidak memuat installer atau SHA256SUMS.txt, jadi tidak bisa diverifikasi.");
     public string UpdateRateLimited => T("GitHub limits how often it can be asked; try again later.", "GitHub membatasi frekuensi permintaan; coba lagi nanti.");
     public string UpdateTimedOut => T("GitHub did not answer in time.", "GitHub tidak menjawab tepat waktu.");
     public string UpdateBadAnswer => T("GitHub sent an answer Niskala cannot read.", "GitHub mengirim jawaban yang tidak bisa dibaca Niskala.");
@@ -45,9 +44,6 @@ public sealed partial class Strings
 
     public string UpdateInstalledCopy(string root) =>
         T($"Installed in {root}; an update runs the installer.", $"Terpasang di {root}; pembaruan menjalankan installer.");
-
-    public string UpdatePortableCopy(string root) =>
-        T($"Portable copy in {root}; an update is saved to Downloads.", $"Salinan portabel di {root}; pembaruan disimpan ke folder Unduhan.");
 
     public string UpdateStatusText(UpdateStatus status, string? latest) => status switch
     {
@@ -67,7 +63,4 @@ public sealed partial class Strings
         : T($"Downloading {name}: {received} of {total}", $"Mengunduh {name}: {received} dari {total}");
 
     public string UpdateVerified(string name) => T($"{name}: SHA-256 matches.", $"{name}: SHA-256 cocok.");
-
-    public string UpdateSaved(string path, string root) =>
-        T($"Saved to {path}. Close Niskala, then unzip it over {root}.", $"Disimpan ke {path}. Tutup Niskala, lalu ekstrak di atas {root}.");
 }

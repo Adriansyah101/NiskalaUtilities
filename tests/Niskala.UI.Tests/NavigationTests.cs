@@ -14,7 +14,7 @@ public sealed class NavigationTests
         Assert.Equal([Section.Apps, Section.Tracker, Section.Picker], Pages(nav, NavGroup.Apps));
         Assert.Equal([Section.QuickScan, Section.SelectiveClean, Section.Registry], Pages(nav, NavGroup.Cleaning));
         Assert.Equal([Section.Resources, Section.Suspend], Pages(nav, NavGroup.Performance));
-        Assert.Equal([Section.Storage, Section.Duplicates, Section.Wipe, Section.Repair, Section.History], Pages(nav, NavGroup.Maintenance));
+        Assert.Equal([Section.Drives, Section.Repair, Section.History], Pages(nav, NavGroup.Maintenance));
     }
 
     [Fact]
@@ -98,11 +98,11 @@ public sealed class NavigationTests
         nav.Shown += shown.Add;
         nav.Toggle(Category(nav, NavGroup.Cleaning));
 
-        nav.Select(Section.Duplicates);
+        nav.Select(Section.Drives);
 
-        Assert.Equal([Section.Duplicates], shown);
-        Assert.Equal(Section.Duplicates, nav.Selected);
-        Assert.Equal([Section.Duplicates], nav.Pages.Where(p => p.IsSelected).Select(p => p.Section));
+        Assert.Equal([Section.Drives], shown);
+        Assert.Equal(Section.Drives, nav.Selected);
+        Assert.Equal([Section.Drives], nav.Pages.Where(p => p.IsSelected).Select(p => p.Section));
         Assert.Equal([NavGroup.Maintenance], nav.Categories.Where(c => c.IsActive).Select(c => c.Group));
         Assert.Equal([NavGroup.Apps, NavGroup.Cleaning, NavGroup.Maintenance], nav.Categories.Where(c => c.IsExpanded).Select(c => c.Group));
         Assert.True(Category(nav, NavGroup.Apps).IsOpen);
@@ -112,14 +112,14 @@ public sealed class NavigationTests
     [InlineData(Section.Repair, NavGroup.Maintenance)]
     [InlineData(Section.Resources, NavGroup.Performance)]
     [InlineData(Section.QuickScan, NavGroup.Cleaning)]
-    [InlineData(Section.Storage, NavGroup.Maintenance)]
+    [InlineData(Section.Drives, NavGroup.Maintenance)]
     [InlineData(Section.History, NavGroup.Maintenance)]
     [InlineData(Section.Picker, NavGroup.Apps)]
     [InlineData(Section.Tracker, NavGroup.Apps)]
     public void A_page_opened_from_the_command_palette_opens_its_collapsed_category(Section section, NavGroup group)
     {
         var nav = new NavigationViewModel();
-        nav.Select(Section.Wipe);
+        nav.Select(Section.Drives);
         foreach (NavCategory open in nav.Categories.Where(c => c.IsExpanded).ToArray())
         {
             nav.Toggle(open);
@@ -184,7 +184,7 @@ public sealed class NavigationTests
         Assert.Contains(nameof(NavCategory.ShowPages), changed);
         Assert.Contains(nameof(NavCategory.IsOpen), changed);
 
-        nav.Select(Section.Wipe);
+        nav.Select(Section.Drives);
         Assert.True(Category(nav, NavGroup.Maintenance).IsActive);
         Assert.False(Category(nav, NavGroup.Maintenance).ShowPages);
 

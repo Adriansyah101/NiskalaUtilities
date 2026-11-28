@@ -36,17 +36,11 @@ internal sealed class FakeHandler : HttpMessageHandler
     }
 }
 
-internal sealed class FakeShell(string downloads) : IUpdateShell
+internal sealed class FakeShell : IUpdateShell
 {
-    public string DownloadsFolder { get; } = downloads;
-
     public List<(string Program, string Arguments)> Started { get; } = [];
 
-    public List<string> Revealed { get; } = [];
-
     public void Start(string program, string arguments) => Started.Add((program, arguments));
-
-    public void Reveal(string path) => Revealed.Add(path);
 }
 
 internal sealed class Recorder<T> : IProgress<T>
@@ -73,7 +67,7 @@ internal static class Releases
             ($"NiskalaUtilities-Setup-v{version}-win-x64.exe", 4),
             ($"NiskalaUtilities-v{version}-win-x64.zip", 5),
             ($"NiskalaUtilities-CLI-v{version}-win-x64.zip", 6),
-            ("NiskalaUtilities-v0.1.9-win-x64.zip", 5),
+            ($"NiskalaUtilities-Setup-v{version}-win-arm64.exe", 7),
             ("SHA256SUMS.txt", 300),
         ];
 

@@ -24,13 +24,11 @@ public sealed partial class ResourceRowCollection : ObservableCollection<Resourc
 
 public sealed partial class SuspendRowCollection : ObservableCollection<SuspendRow>;
 
-public sealed partial class StorageRowCollection : ObservableCollection<StorageRow>;
+public sealed partial class DriveRowCollection : ObservableCollection<DriveRow>;
 
-public sealed partial class ExtensionRowCollection : ObservableCollection<ExtensionRow>;
+public sealed partial class FragmentRowCollection : ObservableCollection<FragmentRow>;
 
-public sealed partial class DuplicateRowCollection : ObservableCollection<DuplicateRow>;
-
-public sealed partial class PathCollection : ObservableCollection<string>;
+public sealed partial class SummaryRowCollection : ObservableCollection<SummaryRow>;
 
 public sealed partial class RepairRowCollection : ObservableCollection<RepairRow>;
 

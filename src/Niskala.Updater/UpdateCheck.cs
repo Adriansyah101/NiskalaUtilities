@@ -7,23 +7,13 @@ public enum UpdateStatus
     NoRelease,
 }
 
-public enum UpdateProduct
-{
-    Desktop,
-    CommandLine,
-}
-
 public sealed record ReleaseAsset(string Name, Uri DownloadUrl, long Size);
 
-public sealed record ReleaseAssets(ReleaseAsset? Installer, ReleaseAsset? Portable, ReleaseAsset? Cli, ReleaseAsset? Checksums)
+public sealed record ReleaseAssets(ReleaseAsset? Installer, ReleaseAsset? Checksums)
 {
-    public static ReleaseAssets None { get; } = new(null, null, null, null);
+    public static ReleaseAssets None { get; } = new(null, null);
 
-    public ReleaseAsset? For(InstallMode mode, UpdateProduct product) => mode switch
-    {
-        InstallMode.Installed => Installer,
-        _ => product == UpdateProduct.Desktop ? Portable : Cli,
-    };
+    public bool IsComplete => Installer is not null && Checksums is not null;
 }
 
 public sealed record UpdateCheck(

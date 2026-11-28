@@ -6,16 +6,15 @@
 [![CPU](https://img.shields.io/badge/CPU-x64%20(Intel%20%2F%20AMD)-blue)](#release-build)
 [![downloads](https://img.shields.io/github/downloads/Adriansyah101/NiskalaUtilities/total?label=downloads&color=brightgreen)](https://github.com/Adriansyah101/NiskalaUtilities/releases)
 
-Windows uninstaller, system and privacy cleaner, resource control, maintenance toolkit and
+Windows uninstaller, system and privacy cleaner, resource control, drive optimizer and
 non-destructive system repair.
 Clean-room implementation: no code or binaries of other uninstallers or system utilities are
 analysed or reused.
 
-One engine, two front ends: `niskala.exe`, a command line, and `Niskala.exe`, a WinUI 3 desktop
-app. Both are Native AOT builds (`win-x64`, `win-arm64`). The product name is Niskala Utilities;
-namespaces, file names, the `.nsklog` extension and `%LocalAppData%\Niskala` keep the short name.
-This is an early release: version 0.2.0. Released under the GNU General Public License v3.0; see
-[License](#license).
+`Niskala.exe` is a WinUI 3 desktop app, built with Native AOT (`win-x64`, `win-arm64`) and shipped
+as one installer. The product name is Niskala Utilities; namespaces, file names, the `.nsklog`
+extension and `%LocalAppData%\Niskala` keep the short name. This is an early release: version
+0.3.0. Released under the GNU General Public License v3.0; see [License](#license).
 
 ## Modules
 
@@ -26,7 +25,7 @@ This is an early release: version 0.2.0. Released under the GNU General Public L
 | Registry Integrity | File types, shared files, COM classes, firewall rules and services that point at missing programs. |
 | Resource Control | Startup entries, third-party services, scheduled tasks and context-menu handlers, with a boot-impact estimate. |
 | Process Suspend | Freezing, efficiency mode and CPU caps for idle background processes. |
-| Storage Map, Duplicate Scan, Secure Wipe | The maintenance toolkit. |
+| Drive Optimizer | Hard disk defragmentation with speed zones and TRIM for solid-state drives, with a live cluster map. |
 | System Repair | DISM, SFC, network resets, DNS flush and an online disk scan from a closed list. |
 | Updates | Checks the GitHub releases and installs a new version once its SHA-256 checksum matches. |
 
@@ -44,36 +43,31 @@ All of them ship in this release.
 | `src/Niskala.Tracker` | Install Tracker: kernel trace of an installer's process tree, noise filter, `.nsklog` install logs, exact rollback through the Guardian. |
 | `src/Niskala.Repair` | System Repair: the closed `RepairCommandId` list, its argument allowlist, and the process runner that decodes and parses the tools' console output. |
 | `src/Niskala.Cleaner` | Quick Scan, Selective Clean and Registry Integrity: the rule catalog, browser profiles and their locks, SQLite compaction, the cleaner and the registry checks. |
-| `src/Niskala.Optimizer` | Resource Control (startup, services, tasks, context menus, boot impact) and Process Suspend. |
-| `src/Niskala.Toolkit` | Storage Map, Duplicate Scan and Secure Wipe. |
-| `src/Niskala.Updater` | Updates: the GitHub release client, semantic versions, `SHA256SUMS.txt`, the verified downloader, install-mode detection and the update launcher. |
+| `src/Niskala.Optimizer` | Resource Control (startup, services, tasks, context menus, boot impact), Process Suspend and the Drive Optimizer (media detection, cluster bitmap, free-space index, speed zones, cluster moves, I/O throttle, TRIM). |
+| `src/Niskala.Updater` | Updates: the GitHub release client, semantic versions, `SHA256SUMS.txt`, the verified downloader and the installer launcher. |
 | `rules/*.json` | The cleaning rules; a release carries them in `lib\rules\`. |
 | `native/Niskala.EtwHelper` | C++20 DLL (MSVC v143) that runs the real-time ETW session and follows the process tree; a small C ABI for `Niskala.Interop`. |
 | `native/Niskala.Launcher` | C++20 launcher (MSVC v143) shipped as the release's root `Niskala.exe`; it starts the desktop app in `lib\`. |
-| `src/Niskala.CLI` | `niskala.exe` (System.CommandLine, Native AOT, `asInvoker`). |
-| `src/Niskala.Host` | Composition root shared by the CLI and the UI. |
+| `src/Niskala.Host` | Composition root of the desktop app. |
 | `src/Niskala.UI` | WinUI 3, unpackaged, self-contained, Native AOT, `requireAdministrator`. |
 | `tests/*` | xunit v3 on Microsoft.Testing.Platform. |
-| `scripts/Build-Release.ps1` | Release build: tests, Native AOT publish, launcher, `lib\` layout, privacy scan, installer, zips and checksums. |
+| `scripts/Build-Release.ps1` | Release build: tests, Native AOT publish, launcher, `lib\` layout, privacy scan, installer and checksums. |
 | `PATCHNOTES.md` | Changes per release; embedded in `Niskala.Updater` and copied to `lib\PATCHNOTES.md`. |
-| `scripts/New-ReleaseArchive.cs` | File-based .NET program that writes the release zips with `CompressionLevel.SmallestSize`. |
 | `installer/NiskalaUtilities.iss` | Inno Setup script for `NiskalaUtilities-Setup-v<version>-<rid>.exe`. |
 | `scripts/New-AppIcon.ps1` | Renders `assets/niskala.ico` (16 to 256 px) from the monogram geometry in `NiskalaMark.xaml`. |
 | `LICENSE` | GNU General Public License v3.0; a release carries it in `lib\LICENSE`. |
 
-Dependencies point one way: `UI`/`CLI` -> `Host` -> `Uninstall`, `Tracker`, `Cleaner`, `Optimizer` and `Toolkit` -> `Guardian` ->
+Dependencies point one way: `UI` -> `Host` -> `Uninstall`, `Tracker`, `Cleaner` and `Optimizer` -> `Guardian` ->
 `Scanner` -> `Core` -> `Interop`; `Host` -> `Repair` -> `Core`; `Host` -> `Updater` -> `Interop`. The Quick Scan reads startup items
 through `IStartupReview`, which the host implements with Resource Control, so the cleaner does not
 depend on the optimizer.
 
-Both front ends take their services from `NiskalaHost`, so they share one inventory, one set of
-guard rules and one Guardian journal: a transaction made in the desktop app can be restored from
-the command line and the other way round. `niskala.exe` runs `asInvoker`, so machine-wide work and
-`track` need an elevated prompt; `Niskala.exe` is `requireAdministrator`.
-`Niskala.EtwHelper.dll` is loaded only when an install is recorded; a build puts it next to each
+The desktop app takes its services from `NiskalaHost`, so every page shares one inventory, one set
+of guard rules and one Guardian journal. `Niskala.exe` is `requireAdministrator`.
+`Niskala.EtwHelper.dll` is loaded only when an install is recorded; a build puts it next to the
 executable, a release in `lib\`. All state lives under `%LocalAppData%\Niskala`: `cache`, `icons`, `fingerprints`,
-`transactions`, `logs`, `ui-settings.json` and `restraints.json` (the processes Process Suspend is
-holding).
+`transactions`, `logs`, `ui-settings.json` (theme, language, update check and the last page shown)
+and `restraints.json` (the processes Process Suspend is holding).
 
 ## Build and test
 
@@ -93,12 +87,12 @@ Path and folder-size tests create directory junctions under `%TEMP%\niskala-test
 `mklink /J` (no elevation needed) and remove the links before anything else. Guardian tests also
 use scratch keys below `HKCU\Software\NiskalaTests` (including a registry symbolic link), and one
 test moves a scratch file and folder to the Recycle Bin and restores them. From a normal prompt no
-test creates a restore point, removes a firewall rule or touches a service. The cleaner, optimizer
-and toolkit tests work the same way: their roots, profiles, rule files, SQLite databases, registry keys and
+test creates a restore point, removes a firewall rule or touches a service. The cleaner and optimizer
+tests work the same way: their roots, profiles, rule files, SQLite databases, registry keys and
 services key all live in the scratch folder and `HKCU\Software\NiskalaTests-<pid>`; recycled files
 are restored again; the process tests suspend, throttle and cap a copy of `PING.EXE` they start
-themselves; the free-space wipe writes at most 8 MB into the scratch folder. Nothing touches a real
-browser profile, startup entry, service or task.
+themselves; the Drive Optimizer tests run on an in-memory disk that records every cluster move. Nothing
+touches a real browser profile, startup entry, service, task or volume.
 
 Four tests need elevation and are skipped from a normal prompt: the real kernel trace (`cmd.exe` and
 `reg.exe` writing to scratch locations, then a rollback), a real restore point (removed again by its
@@ -115,139 +109,65 @@ powershell -ExecutionPolicy Bypass -File scripts\Build-Release.ps1 [-Runtime win
 
 The version (`Version`, `AssemblyVersion`, `FileVersion`, `InformationalVersion`) comes from
 `Directory.Build.props`; the launcher's version resource and the installer take it from there as
-well. Both front ends publish with `OptimizationPreference=Size`, `IlcTrimMetadata=true` and
-`StackTraceSupport=false`, so a crash log carries no method names. The desktop app references the
-Windows App SDK's WinUI package rather than the whole SDK, which keeps the AI, machine learning,
-search and widget runtimes out of `lib\`. The installer needs Inno Setup 6 or 7 (`ISCC.exe`); the
-script finds it on `PATH`, through its Uninstall entry or in the usual program folders, and without
-it builds the zips alone and says how to install it
-(`winget install --id JRSoftware.InnoSetup -e`). The script
-first empties `artifacts/release`, so zips of an older version never linger, and stops at the
-first failure:
+well. The desktop app publishes with `OptimizationPreference=Size`, `IlcTrimMetadata=true` and
+`StackTraceSupport=false`, so a crash log carries no method names. It references the Windows App
+SDK's WinUI package rather than the whole SDK, which keeps the AI, machine learning, search and
+widget runtimes out of `lib\`. The installer needs Inno Setup 6 or 7 (`ISCC.exe`); the script finds
+it on `PATH`, through its Uninstall entry or in the usual program folders, and stops with the way to
+install it (`winget install --id JRSoftware.InnoSetup -e`) when it is missing. The script first
+empties `artifacts/release`, so files of an older version never linger, and stops at the first
+failure:
 
 1. **Tests.** Every test project runs in Release (`dotnet test --solution Niskala.sln -c Release`).
    Run from a normal prompt, it warns that the four elevated tests are skipped; run it elevated
    before a release.
 2. **Launcher.** `native/Niskala.Launcher` is rebuilt with the Visual Studio MSBuild.
-3. **Publish.** Both front ends are published with Native AOT. The linker gets
-   `/PDBALTPATH:%_PDB%`, so an executable names its PDB without a folder. The script checks that
-   the executables and helpers are there, that no managed `Niskala.*.dll` is left, which would
-   mean the AOT compile did not run, and that every executable carries the product name and version
-   in its version resource. Windows App SDK copies its `.mui` files as native assets, which
+3. **Publish.** The desktop app is published with Native AOT into `artifacts/staging`. The linker
+   gets `/PDBALTPATH:%_PDB%`, so an executable names its PDB without a folder. The script checks
+   that the executable and the ETW helper are there, that no managed `Niskala.*.dll` is left, which
+   would mean the AOT compile did not run, and that every executable carries the product name and
+   version in its version resource. Windows App SDK copies its `.mui` files as native assets, which
    `SatelliteResourceLanguages` does not filter, so the desktop project drops every language folder
    but `en-US` and `id-ID` itself.
-4. **Layout.** Only executables stay at the root of a payload; everything else goes to `lib\`:
-   - `NiskalaUtilities-CLI-v<version>-<rid>`: `niskala.exe`, and `lib\Niskala.EtwHelper.dll`,
-     which only `track` loads (from `lib\` first, then next to the program);
-   - `NiskalaUtilities-v<version>-<rid>`: `Niskala.exe`, the launcher, and `lib\` with the
-     desktop app (`lib\Niskala.exe`), the self-contained Windows App SDK runtime, its resources and
-     `Niskala.EtwHelper.dll`.
-
-   Every executable must carry `assets/niskala.ico` and the expected `FileDescription`:
-   `Niskala Utilities` for the launcher and the desktop app, `Niskala Utilities CLI` for
-   `niskala.exe`, `Niskala Utilities Setup` for the installer.
-
-   Both payloads get the repository's `rules/*.json` in `lib\rules\`, its `LICENSE` in
-   `lib\LICENSE` and its `PATCHNOTES.md` in `lib\PATCHNOTES.md`; the published `niskala.exe`
-   then loads the rules (`clean rules --json`) and the build stops if it cannot. Any language folder in `lib\` other than those in
-   `SatelliteResourceLanguages` (`en-US`, `id-ID`) is removed, and a `.pdb` left in a payload
-   stops the build.
+4. **Layout.** Only the launcher stays at the root; everything else goes to `lib\`: the desktop app
+   (`lib\Niskala.exe`), the self-contained Windows App SDK runtime, its resources,
+   `Niskala.EtwHelper.dll`, the repository's `rules/*.json` in `lib\rules\` (each must parse as
+   JSON), its `LICENSE` in `lib\LICENSE` and its `PATCHNOTES.md` in `lib\PATCHNOTES.md`. Any
+   language folder other than those in `SatelliteResourceLanguages` (`en-US`, `id-ID`) is removed,
+   and a `.pdb` left in the layout stops the build. Every executable must carry
+   `assets/niskala.ico` and the expected `FileDescription`: `Niskala Utilities` for the launcher and
+   the desktop app, `Niskala Utilities Setup` for the installer.
 
    The launcher starts `lib\Niskala.exe` with the same arguments through `ShellExecuteEx`, so the
-   app's `requireAdministrator` manifest raises the usual UAC prompt, and exits. The app keeps its
-   flat runtime layout inside `lib\`, where Windows App SDK finds its DLLs, `.pri` files and
-   activation entries as in any self-contained app. The two executables cannot share one folder:
-   Windows file names ignore case, so `Niskala.exe` and `niskala.exe` are one name.
+   app's `requireAdministrator` manifest raises the usual UAC prompt. The app keeps its flat runtime
+   layout inside `lib\`, where Windows App SDK finds its DLLs, `.pri` files and activation entries as
+   in any self-contained app.
 5. **Symbols.** The PDBs move to `artifacts/symbols`. The Native AOT linker records object-file
    paths in them, so they stay on the build machine for crash analysis and never ship.
 6. **Privacy scan.** Every shipped file is searched as ASCII and as UTF-16 for the user name, the
    machine name, the profile path and the repository path. Any hit fails the build.
-7. **Installer.** `ISCC.exe` compiles `installer/NiskalaUtilities.iss` from both payloads into
-   `NiskalaUtilities-Setup-v0.2.0-win-x64.exe` (LZMA2 ultra64, solid). It installs to
-   `%ProgramFiles%\Niskala Utilities` with the desktop app at the root, the optional command line
-   in `cli\` (its own `niskala.exe` and `lib\`, since the two names collide), a Start menu
-   shortcut, an optional desktop shortcut and an optional `PATH` entry for `cli\`, which the
-   uninstaller takes out again. The license is shown before installing. `CloseApplications` and
+7. **Installer.** `ISCC.exe` compiles `installer/NiskalaUtilities.iss` from the staged layout into
+   `NiskalaUtilities-Setup-v0.3.0-win-x64.exe` (LZMA2 ultra64, solid). It installs to
+   `%ProgramFiles%\Niskala Utilities` with a Start menu shortcut and an optional desktop shortcut,
+   and shows the license before installing. An update from an earlier version also removes the
+   `cli\` folder and its `PATH` entry that those versions could install. `CloseApplications` and
    `RestartApplications` let an update replace a running copy; a silent run with
-   `/RESTARTAPPLICATIONS` starts Niskala again when it is done. The installer is privacy-scanned and
-   version-checked like the executables.
-8. **Archives.** Each payload is zipped with its folder at the root by
-   `scripts/New-ReleaseArchive.cs` (`dotnet run --file`, `CompressionLevel.SmallestSize`; Windows
-   PowerShell 5.1 runs on .NET Framework, which lacks that level):
-   `NiskalaUtilities-v0.2.0-win-x64.zip` and `NiskalaUtilities-CLI-v0.2.0-win-x64.zip`.
-   `SHA256SUMS.txt` lists the installer and the two zips in `sha256sum -c` format, and the build
-   fails if `artifacts/release` holds any other file. Upload it with
-   every release: the updater refuses a release without it.
+   `/RESTARTAPPLICATIONS` starts Niskala again when it is done. The installer is privacy-scanned
+   and version-checked like the executables, and the staging folder is deleted afterwards.
+8. **Checksums.** `SHA256SUMS.txt` lists the installer in `sha256sum -c` format, and the build fails
+   if `artifacts/release` holds anything else. Upload both with every release: the updater refuses
+   a release without the checksums.
 
-The program folder the user unpacked counts as Niskala's own: PathGuard protects `lib\` and the
-folder above it.
+The program folder counts as Niskala's own: PathGuard protects `lib\` and the folder above it.
 
 ARM64 builds need the MSVC ARM64 build tools as well.
 
-## CLI
+## Inventory
 
-| Command | What it does |
-|---|---|
-| `list` | Installed applications: Uninstall keys, Windows Installer and Store apps (MSIX and AppX packages). |
-| `size` | Folder sizes, without following junctions or symbolic links. |
-| `icons` | Extract the 256 px icon of every visible application into the icon cache. |
-| `inspect` | Resolve the uninstall command, run the preflight checks and take a fingerprint; nothing is removed. |
-| `uninstall` | Run the application's own uninstaller and verify that it is gone; with an install log, offer its rollback. A Steam game is removed directly. Several applications run as one Batch Remove queue with one leftover review at the end. |
-| `leftovers` | Find and score what an application left behind, optionally as a tree of what each folder and key holds; nothing is removed. |
-| `clean` | Quick Scan, the rule list, Selective Clean and Registry Integrity; `clean app` removes an uninstalled app's leftovers (Safe items by default). All of it as Guardian transactions. |
-| `restore` | List Guardian transactions or undo one. |
-| `force` | Remove an application without its uninstaller: by name, folder, program or shortcut, or the window, desktop icon or tray icon at a screen point. |
-| `track` | Record what an installer changes (elevated). |
-| `logs` | List, show, roll back or delete recorded installs. |
-| `repair` | List the System Repair commands or run one, with its output and progress live (elevated). |
-| `optimize` | Resource Control: list and switch startup entries, services, tasks and context-menu handlers. Process Suspend: list processes, suspend, efficiency mode, CPU cap, resume. |
-| `toolkit` | Storage Map, Duplicate Scan, Secure Wipe of files and of free space. |
-| `update` | Check GitHub for a newer release, or download, verify and install it. |
-
-```
-niskala list [--json] [--all] [--source all|win32|store] [--no-msi-index]
-niskala size [folders...] [--installed] [--json]
-niskala icons [--json] [--prune]
-niskala inspect <app> [--silent] [--all] [--files] [--json]
-niskala uninstall <app>... [--dry-run] [--silent] [--yes] [--all] [--no-restore-point] [--no-log] [--close-steam | --via-steam] [--permanent] [--json]
-niskala leftovers <app> [--all] [--low] [--tree <depth>] [--json]
-niskala clean quick [--dry-run] [--yes] [--permanent] [--no-restore-point] [--json]
-niskala clean rules [--json]
-niskala clean run <rule|prefix*|category>... [--dry-run] [--yes] [--permanent] [--no-restore-point] [--json]
-niskala clean registry [--check <kind>...] [--fix] [--dry-run] [--yes] [--no-restore-point] [--json]
-niskala clean app <app> [--dry-run] [--yes] [--permanent] [--review] [--no-restore-point] [--json]
-niskala restore [<transaction>] [--yes] [--json]
-niskala force <app|folder|file.exe|.lnk|.url> | --at X,Y [--dry-run] [--yes] [--permanent] [--review] [--no-restore-point] [--all] [--json]
-niskala track <installer.exe|.msi> [--args "..."] [--name "..."] [--json]
-niskala logs [--json]
-niskala logs show <id> [--json]
-niskala logs rollback <id> [--dry-run] [--yes] [--permanent] [--no-restore-point] [--json]
-niskala logs delete <id> [--yes]
-niskala repair list [--json]
-niskala repair run <command> [--yes] [--json] [--source <image>]
-niskala optimize list [--kind <kind>...] [--json]
-niskala optimize disable|enable <id|name> [--dry-run] [--yes] [--json]
-niskala optimize processes [--idle] [--sample <seconds>] [--json]
-niskala optimize suspend|eco <pid> [--dry-run] [--json]
-niskala optimize resume <pid> | --all [--json]
-niskala optimize limit <pid> [--cpu <percent>] [--seconds <n>] [--dry-run]
-niskala toolkit map <folder> [--depth <n>] [--top <n>] [--json]
-niskala toolkit duplicates <folder>... [--min-size <bytes>] [--hidden] [--keep Oldest|Newest] [--remove] [--dry-run] [--permanent] [--yes] [--json]
-niskala toolkit wipe <file>... [--method ZeroFill|Dod522022M|Gutmann] [--dry-run] [--yes] [--json]
-niskala toolkit wipe-free <drive> [--method ZeroFill|Dod522022M|Gutmann] [--dry-run] [--yes] [--json]
-niskala update check [--json]
-niskala update install [--dry-run] [--yes] [--json]
-```
-
-Every command that changes something has `--dry-run`, asks before it acts (`--yes` skips the
-question; with redirected input it must be given), and writes the plan and its transaction with
-`--json`. A change that needs elevation exits with `740` before it starts; Ctrl+C exits with `130`.
-
-`list` merges three sources. The Uninstall keys come from the HKLM 64-bit and 32-bit views and
-from HKCU. Windows Installer products are read with `MsiEnumProductsEx`. Store apps (MSIX and AppX
-packages) are read with `Windows.Management.Deployment.PackageManager` for the current user, main
-packages only, so frameworks and resource packages never show; `--source store` lists them alone.
-The deduplication rules:
+The app list merges three sources. The Uninstall keys come from the HKLM 64-bit and 32-bit views
+and from HKCU. Windows Installer products are read with `MsiEnumProductsEx`. Store apps (MSIX and
+AppX packages) are read with `Windows.Management.Deployment.PackageManager` for the current user,
+main packages only, so frameworks and resource packages never show. The deduplication rules:
 
 - **Uninstall entries.** Two entries are duplicates only when they share a ProductCode, or when
   name, version, publisher and uninstall command are all identical.
@@ -264,18 +184,18 @@ stamped with the Uninstall key's last write time. Other entries without one take
 folder, except shared installer caches and Steam games: a Steam game's uninstaller is the Steam
 client, whose folder holds every game.
 
-`size` measures folders with `FileSystemEnumerable` without following reparse points. It uses one
+Folder sizes are measured with `FileSystemEnumerable` without following reparse points. It uses one
 queue per volume, with 4 workers on SSD, 1 on HDD and 2 when the disk kind is unknown. The disk
 kind comes from `IOCTL_STORAGE_QUERY_PROPERTY` (seek penalty).
 
-`icons` writes 256 px PNGs to `%LocalAppData%\Niskala\icons`. It extracts them on a dedicated STA
+Icons are cached as 256 px PNGs in `%LocalAppData%\Niskala\icons`. It extracts them on a dedicated STA
 thread: `SHDefExtractIconW` first, then `IShellItemImageFactory`. The source is tried in this
 order: `DisplayIcon`, MSI `ProductIcon`, the uninstaller, or the package's app-list logo.
-`--prune` deletes cached icons that no installed application maps to. A package also records the
+A package also records the
 manifest's `BackgroundColor` (`package.logoBackground`) so a white unplated glyph can be drawn on
 its plate.
 
-`inspect` changes nothing. It accepts an id, an exact name or part of a name, and shows:
+The inspector changes nothing until a removal starts, and shows:
 
 - **the uninstall command** in both modes. A Windows Installer product always runs
   `%SystemRoot%\System32\msiexec.exe /x {ProductCode}`, and silent mode adds `/qn /norestart`.
@@ -295,13 +215,11 @@ its plate.
   without `Resolve`; advertised shortcuts through `MsiGetShortcutTarget`). The install folder
   counts only when PathGuard allows it.
 
-The exit code is 0 when the preflight can proceed, 1 when it is blocked and 2 when the name
-matches no application or several.
-
 ## Desktop app
 
 `Niskala.exe` (WinUI 3, unpackaged, Native AOT) runs elevated. The small launcher in the release
-root starts it and shows the splash card while the main window is built: 560 x 320, out of the
+root starts it and shows the splash card while the main window is built: 560 x 320 DIP at the scaling of
+the monitor under the cursor (`GetDpiForMonitor`), never more than 90% of its work area, out of the
 taskbar, rounded at 12 px, on the brand gradient (`#183D66` to `#08111E`), drawn with Direct2D and
 DirectWrite into a premultiplied bitmap and shown with `UpdateLayeredWindow`. Its loop runs on
 `QueryPerformanceCounter` time and waits for each desktop frame with `DwmFlush`, with cubic easing
@@ -315,7 +233,7 @@ simply appears when it has drawn its first frame. The title bar's monogram is on
 (`NiskalaMark`); no image file is loaded. The executables carry `assets/niskala.ico` (16 to 256 px),
 and the main window takes its icon from that resource.
 A left rail, open and docked at start (272 px, folded to a 56 px icon bar by its menu button), holds
-thirteen sections under four categories (Apps, Cleaning, Performance, Maintenance), each an item with
+twelve sections under four categories (Apps, Cleaning, Performance, Maintenance), each an item with
 its own icon that opens and closes its pages with a click. The category of the page on screen starts
 open and wears an accent pill, another open category a neutral one; pages are indented beside a thin
 guide line that marks the page on screen. With every category open the rail still fits the default
@@ -332,6 +250,19 @@ so nothing waits for an animation to end. With Windows' "Animation effects" off
 (`UISettings.AnimationsEnabled`), every change is instant. The timing is `NavMotion`. The default theme is a dark slate
 (`#09090b` / `#121317`); a light theme and English or Indonesian are one click away in the rail
 and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:Bind}`.
+
+The footer's theme and language buttons name what is in use (**Dark theme** or **Light theme**,
+**English**; **Tema gelap** or **Tema terang**, **Bahasa Indonesia**) with a switch icon, and their
+tooltip says what a click changes, open or folded. A theme switch repaints every page (pages not on
+screen are built again when they are next shown), the caption buttons and the cluster map. The
+window opens centred at 1320 x 860 DIP or 92% of the monitor's work area, whichever is smaller,
+and never below 960 x 640 DIP unless the work area itself is smaller; the minimum follows the
+scaling when the window moves to another monitor (`WindowPlacement`). Below 760 DIP of height the
+rail packs its items tighter, below 1000 DIP of width it folds to icons (and opens again from
+1040 DIP if it folded itself), and the title bar shortens its search box and drops the version and
+then the administrator badge before anything overlaps. Two-column pages share their width in
+proportion instead of fixed columns. The app opens on the last page shown; a page saved by an
+older version that no longer exists opens Apps (`UiSettings.Sanitized`).
 
 - **Apps.** A virtualized list with instant filters (All, Win32, Store apps, Large, Recently
   installed, Broken), 256 px icons (packages on their `BackgroundColor` plate) and folder sizes
@@ -397,12 +328,15 @@ and are kept in `%LocalAppData%\Niskala\ui-settings.json`. Every binding is `{x:
 - **Process Suspend.** Processes of this session with their CPU use over 1.5 s, by default only the
   idle background ones that may be touched; Suspend, Efficiency mode, Limit CPU to 20% and Resume on
   each row, Resume all at the top. Refused processes say why.
-- **Storage Map.** A folder or drive, Map, then its largest sub-folders with share bars (a click goes
-  down a level, Up comes back) and the largest file types beside them.
-- **Duplicate Scan.** Folders as chips, keep the oldest or newest copy, Scan, then every group with
-  each copy marked Keep, Remove or Protected; Remove copies asks first and uses the Recycle Bin.
-- **Secure Wipe.** The method (zero fill, DoD 5220.22-M, Gutmann), files added one by one, Wipe
-  files, and Wipe free space for a fixed drive; both ask first and show the pass and bytes written.
+- **Drive Optimizer.** The fixed drives on the left, each with its label, an `HDD` or `SSD` badge,
+  the file system, capacity and free space, how fragmented it is and its action (**Defragment** or
+  **Optimize (TRIM)**). On the right: **Analyze**, the mode for a hard disk (**Quick Defrag**,
+  **Consolidate Free Space**, **Full Zone Optimization**), the main button that reads **Optimize
+  (TRIM)** for a solid-state drive, **Cancel**, a 0 to 100 progress bar with the elapsed time, the
+  live cluster map with its legend (free space, contiguous, fragmented, archive zone, system or
+  locked) and two tabs: **Fragmented files** (hard disks only: the 500 most fragmented files with a
+  check box, fragment count, size and target zone, **Check all**, **Clear** and **Defrag checked**)
+  and **Drive health & summary**. One banner reports the last run and is never empty.
 
   Every page is locked to the window height; only its lists scroll.
 - **System Repair.** The repair list on the left; on the right the selected command line, Run and
@@ -479,12 +413,6 @@ Windows does not know, DISM's `0x800F081F` (no repair source), `0x800F0906` (dow
 that need an offline repair. Anything else is `Failed` with its code. The first three suggest a
 local repair source.
 
-`niskala repair run` prints the tool's lines as they come; on a console the redrawn line is updated
-in place. It asks before a repair that changes Windows (`--yes` skips the question) and exits with
-`0`, `3010` when a restart is needed, `740` when not elevated, `130` when cancelled with Ctrl+C,
-and `1` otherwise. `--json` writes the result to stdout and the tool's output to stderr.
-`--source <image>` repairs `dism-restore-health` from a local `install.wim` or `install.esd`.
-
 ## Cleaner
 
 `Niskala.Cleaner` cleans from declarative rules in `rules/*.json` (a release reads `lib\rules\`).
@@ -537,7 +465,7 @@ Guardian cleanup session:
    Files in use are left alone, never scheduled for a restart;
 3. sub-folders the rule emptied are removed bottom up, never the target folder itself;
 4. the journal records one entry per rule with counts and bytes, every recycled file with its
-   `$R` path (so `restore` brings it back) and every compacted database with the bytes saved.
+   `$R` path (so a restore from History & backups brings it back) and every compacted database with the bytes saved.
 
 The cleaner's PathGuard adds `Self` rules for the cache folders the shipped rules name inside
 protected trees: `Windows\Temp`, `Windows\Minidump`, the Delivery Optimization cache, the WER
@@ -568,7 +496,7 @@ Windows folder, and absent in both expansions a 32-bit entry can mean (`%Program
 through RegistryGuard first: protected ones are listed with the rule that protects them and cannot
 be repaired. A repair checks every issue again, then runs as a Guardian transaction
 (`RegistryIntegrity`): restore point, the keys and values into `registry.json.gz` and
-`registry.reg`, the firewall rules into the journal, and only then the removal. `restore` puts it
+`registry.reg`, the firewall rules into the journal, and only then the removal. A restore puts it
 all back.
 
 ## Resource Control
@@ -599,7 +527,7 @@ Microsoft product root (2010) or application root (2011). Every switch is a Guar
 
 RegistryGuard checks every value it writes and every service key it changes, so boot and system
 start services, services whose image lies in the Windows folder and services whose start type
-cannot be read show as locked. `restore` on such a transaction writes the earlier state back only
+cannot be read show as locked. A restore of such a transaction writes the earlier state back only
 where the current one is still what Niskala set; anything changed since is left alone and named.
 
 The boot-impact estimate is a score from the program's size (below 1 MB, 10 MB, 50 MB, above),
@@ -622,89 +550,135 @@ be asked is refused). Three restraints:
   hands throttling back to Windows.
 - **CPU cap**: a job object with a hard CPU-rate limit (`JOBOBJECT_CPU_RATE_CONTROL_INFORMATION`).
   The cap lives as long as Niskala holds the job: the page lifts it on Resume or when the app
-  closes, and `niskala optimize limit` holds it for `--seconds` or until Ctrl+C.
+  closes.
 
 Suspensions and efficiency mode are kept in `restraints.json` with each process's start time, so
 Resume works after Niskala restarts and never acts on a new process that reused the id. The list
 measures CPU use over a short sample and marks a process idle in the background when it has no
 visible window and used less than 0.5% CPU.
 
-## Toolkit
+## Drive Optimizer
 
-**Storage Map** walks a folder with a pool of workers over a channel (`FileSystemEnumerable`, one
-folder per work item). A folder with `FileAttributes.ReparsePoint` is counted as a link and never
-entered, so junction loops cannot happen. The result is a tree of sizes, file and folder counts,
-the largest sub-folders per level, and file-type groups by extension; unreadable folders are
-counted.
+**Media.** Every fixed drive (`GetLogicalDrives`, `GetDriveTypeW` = `DRIVE_FIXED`) is opened as
+`\\.\<letter>:` with no data access and asked with `IOCTL_STORAGE_QUERY_PROPERTY` for
+`StorageDeviceSeekPenaltyProperty`, `StorageDeviceTrimProperty` and `StorageDeviceProperty` (bus
+type, vendor and product). Hard disks in USB or IEEE 1394 enclosures often hide or misreport the
+seek penalty, so for those buses, and whenever the seek penalty is missing or says none, the drive
+is also asked for its nominal rotation rate: a SCSI `INQUIRY` of the Block Device Characteristics
+page (`B1h`) through `IOCTL_SCSI_PASS_THROUGH`. `MediaClassifier` then decides, solid-state evidence
+first: an NVMe, SD, MMC, SCM or UFS bus, a rotation rate of 1 (non-rotating) or a device name with
+`SSD`, `Solid State` or `NVMe` makes it an `SSD` whose action is **Optimize (TRIM)**, whatever the
+seek penalty says. Otherwise a real spindle speed (1025 to 65534 rpm) or a seek penalty makes it an
+`HDD` whose action is **Defragment**, no seek penalty makes it an `SSD`, and a drive that answers
+none of these is analyzed only. The page shows the bus and the spindle speed next to the badge, for
+example `HDD · NTFS · USB · 4,800 rpm`. `GetVolumeInformationW`, `GetDiskFreeSpaceW` and
+`GetDiskFreeSpaceExW` give the label, file system, cluster size, capacity and free space. Clusters
+are moved only on NTFS, FAT, FAT32 and exFAT. The Win32 calls are `[LibraryImport]` declarations
+with explicit `StructLayout` in `Niskala.Interop.Volumes.VolumeNative`. Reading the cluster
+bitmap and moving clusters need a volume handle with read access: Windows grants it to
+administrators on internal drives and usually to the signed-in user on external USB drives, so a
+USB hard disk can often be analyzed and defragmented without elevation.
 
-**Duplicate Scan** compares in three stages: files of exactly the same size; then SHA-256 over the
-first and last 4 KB (a file of 8 KB or less is hashed whole here and needs no third stage); then a
-full SHA-256. Hard links to one file count once, junctions and hidden or system files are skipped
-unless asked for. Every copy in a result group is checked by PathGuard; protected copies are shown
-but never removed. The keep rule (oldest or newest last write) picks the copy that stays; before a
-removal the kept copy and each copy to remove are hashed again, and any that changed stays. The rest
-goes through the Guardian as a `DuplicateClean` transaction, to the Recycle Bin by default.
+**Analysis.** `FSCTL_GET_VOLUME_BITMAP` reads the allocation bit of every cluster in 1 MB chunks
+straight into the 64-bit words of `ClusterBitmap` (152 MB for a 5 TB drive, held once), and `FreeSpaceIndex` keeps the contiguous free runs sorted by start and by length
+for first-fit and best-fit searches. The folders are walked with `FindFirstFileExW`
+(`FindExInfoBasic`, `FIND_FIRST_EX_LARGE_FETCH`); reparse points and junctions are never entered.
+`pagefile.sys`, `hiberfil.sys`, `swapfile.sys`, the NTFS metadata files (`$MFT`, `$LogFile`,
+`$Volume`, `$Bitmap` and the rest) and `$Extend` at the root, and every `System Volume Information`
+folder at any depth, are left out from the start, so their clusters, like every allocated cluster
+no scanned file owns, count as **System / locked**. Files keep their folder as one shared string
+per folder, which keeps an analysis of a drive with millions of files compact. Each file is opened
+for `FILE_READ_ATTRIBUTES` and `FSCTL_GET_RETRIEVAL_POINTERS` gives its `(NextVcn, Lcn)` pairs;
+runs that continue on disk are joined before fragments are counted. Only metadata is read, so the
+analysis runs at normal I/O priority on its own below-normal thread, which keeps a cold hard disk
+from starving it; every 256 entries it asks `IoThrottleController` and pauses while other programs
+use the disk. Cancel is checked before every entry, so it stops at once even inside a folder of
+tens of thousands of files. Progress blends the share of allocated clusters scanned with the share
+of the MFT's file records seen (`FSCTL_GET_NTFS_VOLUME_DATA`), so the bar keeps moving through
+folders full of small files.
+`ZoneClassifier` puts programs, libraries and drivers (`.exe`, `.dll`, `.sys` and similar) in the
+**Fast** zone, archives, disc images, videos, virtual disks and backups (`.iso`, `.zip`, `.7z`,
+`.rar`, `.mkv`, `.mp4`, `.bak` and similar), and files of 1 GB or more unchanged for 90 days, in the
+**Archive** zone, and everything else in the **Standard** zone. `ZoneLayout` reserves the first
+clusters (the outer tracks) for the fast files with some slack, the last ones (the inner tracks)
+for the archive and the middle for the rest.
 
-**Secure Wipe** overwrites and deletes; it makes no backup and writes no Guardian journal. A file must
-pass PathGuard, be a regular file (no folder, link, or compressed, encrypted or sparse file, whose
-data moves when rewritten) with no other hard link, and open exclusively. Each pass rewrites the
-whole length with write-through and flushes to the disk:
+**Cluster map.** `DriveMap` keeps per segment of the volume (8192 by default) how many clusters are
+allocated, owned by a file, by a fragmented file and by an archive file, and is updated during the
+scan and after every move. The page draws it into a `WriteableBitmap` at the display's physical
+pixel size (cells of 9 DIP and gaps of 2 DIP rounded to whole pixels), so it stays sharp at every
+scaling, redraws it four times a second while work runs, and takes its five colours from theme
+brushes.
 
-| Method | Passes |
+**Modes.** `DefragPlanner` builds the plan and `DriveDefragmenter` runs it with `FSCTL_MOVE_FILE` in
+steps of at most 16,384 clusters (`MoveChunks`):
+
+| Mode | Plan |
 |---|---|
-| `ZeroFill` | `00` |
-| `Dod522022M` | `00`, `FF`, random |
-| `Gutmann` | 4 random, the 27 fixed patterns (`55`, `AA`, three `92 49 24` phases, `00` to `FF` in steps of `11`, three again, three `6D B6 DB` phases), 4 random |
+| Quick Defrag | Fragmented files (or only the checked ones), most fragments first, each into the smallest free run that holds it. |
+| Consolidate Free Space | Quick Defrag, then files of up to 64 MB, in disk order, into the lowest free run before them, so the gaps close and free space gathers at the end. |
+| Full Zone Optimization | Archive, fast and standard files that are fragmented or outside their zone, packed from the start of their zone, then the same compaction inside each zone. |
 
-Multi-byte patterns keep their phase across chunks. The file is then cut to zero length, its times
-set to 2000-01-01, renamed three times to random names and deleted. A free-space wipe needs a fixed
-local drive: it creates a new folder at the drive's root, fills the free space with 1 GB pattern
-files until the drive is full, rewrites them for every further pass and deletes the folder, also
-when cancelled. Solid-state drives remap blocks, so neither kind of wipe can promise that an old
-copy in a spare block is gone; the CLI and the page say so.
+A file is moved only when every extent is on disk and its virtual clusters run without holes. The
+target is reserved in the index before the move; afterwards the file's extents are read again and
+the bitmap, the index and the map follow what is really on disk. `FSCTL_MOVE_FILE` answers
+`ERROR_ACCESS_DENIED` both for a file the file system will not move and for target clusters that
+another program allocated after the analysis. After a refused step the bitmap of that step's target
+is read again (`FSCTL_GET_VOLUME_BITMAP` from its first cluster): clusters taken in the meantime are
+marked used in the bitmap and the map, the free part of the target goes back to the index, and the
+file is moved elsewhere, up to three times; a large file whose later step hit a taken cluster is
+moved again as a whole so it does not end up in more pieces. Only when the target is still free, or
+the file cannot be opened (`ERROR_SHARING_VIOLATION`, `ERROR_LOCK_VIOLATION`), is it counted as
+locked and skipped. Cancel stops after the current step.
+
+**Background I/O.** Defragmenting and TRIM run on their own thread in `THREAD_MODE_BACKGROUND_BEGIN`, with
+`FILE_IO_PRIORITY_HINT_INFO` set to `IoPriorityVeryLow` on the volume and every moved file.
+`IoThrottleController` reads `IOCTL_DISK_PERFORMANCE` after each step: when other programs read or
+write 8 MB/s or more, or the queue holds two requests or more, the pause between steps doubles from
+20 ms up to 800 ms, and it halves back to 1 ms once the disk is quiet.
+
+**Solid-state drives.** `DriveDefragmenter` and `DefragPlanner` refuse an `SSD` with
+`DriveRelocationRefusedException` before any handle is opened, so no cluster of a solid-state drive
+is ever moved. TRIM first extends a hidden delete-on-close file at the drive's root in 1 GB steps,
+leaving the larger of 4 GB and a tenth of the drive free, and sends `FSCTL_FILE_LEVEL_TRIM` for each
+step; only clusters of that file are trimmed, and closing it frees them again. When the device does
+not accept file-level TRIM, `defrag.exe <drive>: /L /U /V` from the system folder retrims the free
+space instead and its percentage feeds the progress bar.
 
 ## Updates
 
-The Updates page (the rail's footer, or Ctrl+K) and `niskala update` share `Niskala.Updater`:
+The Updates page (the rail's footer, or Ctrl+K) uses `Niskala.Updater`:
 
 1. **Check.** `GET https://api.github.com/repos/Adriansyah101/NiskalaUtilities/releases/latest`
    with `User-Agent: NiskalaUtilities/<version>`, read through a source-generated
    `JsonSerializerContext`. Drafts, pre-releases and pre-release tags are skipped; a `404` means no
-   release yet. The tag (`v0.2.0` or `V0.2.0`) is compared with the running version by semantic
-   versioning precedence. Only assets named exactly for that version and runtime and served from
-   `github.com` count: `NiskalaUtilities-Setup-v<version>-<rid>.exe`,
-   `NiskalaUtilities-v<version>-<rid>.zip`, `NiskalaUtilities-CLI-v<version>-<rid>.zip` and
-   `SHA256SUMS.txt`.
-2. **Install mode.** A copy is installed when it runs inside the folder named by the installer's
-   Uninstall entry (`HKLM\...\Uninstall\{3EC397E4-E199-4B2F-B436-8F7D0FC248B9}_is1`,
-   `InstallLocation`), or when `unins???.exe` with its `.dat` sits in its folder or up to two
-   levels above. Anything else is portable.
-3. **Download.** `SHA256SUMS.txt` is read first (at most 64 KB); a package it does not list is never
-   downloaded. The package goes to a new `%TEMP%\niskala-update-*` folder with byte and percent
-   progress and is hashed while it arrives. A wrong hash or length deletes it.
-4. **Apply.** The hash is checked once more before the file is used. An installed copy runs the
-   installer with `/VERYSILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS` and the desktop app closes;
-   the installer starts it again (the command line passes `/NORESTARTAPPLICATIONS` instead). A
-   portable copy gets the zip of its own kind in Downloads (next to an older file of the same name,
-   never over it), and Explorer shows it.
+   release yet. The tag (`v0.3.0` or `V0.3.0`) is compared with the running version by semantic
+   versioning precedence. Only two assets count, named exactly for that version and runtime and
+   served from `github.com`: `NiskalaUtilities-Setup-v<version>-<rid>.exe` and `SHA256SUMS.txt`.
+   Any other file in the release, such as an archive of an older version, is ignored.
+2. **Download.** `SHA256SUMS.txt` is read first (at most 64 KB); an installer it does not list is
+   never downloaded. The installer goes to a new `%TEMP%\niskala-update-*` folder with byte and
+   percent progress and is hashed while it arrives. A wrong hash or length deletes it.
+3. **Apply.** The hash is checked once more before the file is used. The installer runs with
+   `/VERYSILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS` and the desktop app closes; the installer
+   starts it again.
 
 The desktop app checks when it opens unless "Check when Niskala opens" is off
 (`skipUpdateCheck` in `ui-settings.json`); an update shows as a dot on the rail item. When that
-check finds a newer release with a package for this copy and `SHA256SUMS.txt`, a dialog over a
+check finds a newer release with its installer and `SHA256SUMS.txt`, a dialog over a
 dimmed window (themed `ContentDialog`) names this copy's version and the new one and lists the first
 four items of the release notes. **Update now** opens Updates and starts the download, checksum
 check and install; **Review first** opens Updates with the update button focused; **Later** (or Esc)
 closes it, and the dot stays. It appears once per session, only after the main window is shown and
 visible, and waits while a palette, menu or other dialog is open or a removal, cleaning, repair,
-recording or download is running. A check started by hand never opens it (`UpdatePrompt`).
+optimization, recording or download is running. A check started by hand never opens it (`UpdatePrompt`).
 
 The page's release notes come from `PATCHNOTES.md`, which `Niskala.Updater` embeds as a resource
-(a release also carries it as `lib\PATCHNOTES.md`, the fallback), so an installed and a portable
-copy read them offline. When GitHub's latest release is a version those notes do not cover, its
-release text is shown above them. Both are Markdown rendered as plain headings, paragraphs and
-bullet rows: emphasis, code spans, links and HTML are reduced to their text, and a table row
-becomes one bullet that names its columns.
-`update install --dry-run` downloads and verifies the package, then deletes it.
+(a release also carries it as `lib\PATCHNOTES.md`, the fallback), so they read offline. When
+GitHub's latest release is a version those notes do not cover, its release text is shown above
+them. Both are Markdown rendered as plain headings, paragraphs and bullet rows: emphasis, code
+spans, links and HTML are reduced to their text, and a table row becomes one bullet that names its
+columns.
 
 ## Uninstall execution
 
@@ -721,11 +695,11 @@ I/O completion port.
 2. `Global\_MSIExecute` is free, because the Windows Installer service works outside the job;
 3. the Uninstall key and the install folder stayed unchanged for 3 seconds (60 seconds at most).
 
-`uninstall` runs the plan in this order:
+An uninstall runs the plan in this order:
 
-1. resolve the command and run the preflight, as `inspect` does;
-2. take the fingerprint and save it to `%LocalAppData%\Niskala\fingerprints`, so `leftovers` still
-   has it once the application is gone;
+1. resolve the command and run the preflight, as the inspector does;
+2. take the fingerprint and save it to `%LocalAppData%\Niskala\fingerprints`, so the leftover scan
+   still has it once the application is gone;
 3. ask the Guardian for a checkpoint: a restore point and a backup of the keys the fingerprint
    names (see Guardian);
 4. run the preflight again, then start the uninstaller in a job and wait for completion, or remove
@@ -736,16 +710,13 @@ I/O completion port.
 The outcome comes from the verification first and from the exit code second: an entry that is gone
 is `Removed` whatever the exit code. Windows Installer and Burn codes are mapped (1602 cancelled,
 1605 stale entry, 1618 installer busy, 3010 and 1641 restart); NSIS 1 is a cancel. NSIS relaunches
-itself from `%TEMP%`, so its exit code is the launcher's. `--dry-run` runs nothing. Without `--yes`
-the command asks for confirmation, and with redirected input it refuses instead. Ctrl+C stops the
-wait, never the uninstaller. Exit codes: 0 removed (also pending restart, stale entry, or success
-that could not be verified), 1 blocked or not removed, 2 no single match or no confirmation, 130
-declined or stopped waiting.
+itself from `%TEMP%`, so its exit code is the launcher's. Cancel stops the wait, never the
+uninstaller.
 
 ## Leftover scanner
 
-`leftovers` changes nothing. It takes an installed application (with a fingerprint taken now) or
-one removed by `uninstall` (with the saved fingerprint).
+The leftover scan changes nothing. It takes an installed application (with a fingerprint taken now)
+or one that was uninstalled (with the saved fingerprint).
 
 Names are normalized: NFKC, lower case, without ™®©, version numbers, architecture and locale labels
 and trailing company suffixes. The product tokens are the display name, the name without the
@@ -801,7 +772,7 @@ Where it looks:
 | Scheduled task named like the app whose program is gone | +15 |
 
 Scores are clamped to 0-100: 80 and above is **Safe**, 50 to 79 **Review**, below 50 **Low** (shown
-with `--low`). Personal data is never selected by default: a match below `Documents\My Games` or
+under the Low filter). Personal data is never selected by default: a match below `Documents\My Games` or
 `Saved Games`, below AppData for a Steam game, or a Steam Cloud folder in `userdata` is placed in
 **Review** (50 to 79) when it scores 40 or more, so it is listed but left unchecked; a weaker match
 stays where it is. A file or folder inside a proposed folder goes with it, and its fingerprint evidence
@@ -818,7 +789,6 @@ file count and size, files with size and date, subkeys, and values with their `R
 as Regedit shows it, at most 5,000 entries per level. Junctions and symbolic links are leaves. A
 checked part inside a leftover keeps the leftover's score and reasons, and force accepts such parts
 when the scan after stopping the processes finds the leftover holding them again.
-`leftovers --tree <depth>` prints the same tree.
 
 ## Steam games
 
@@ -841,31 +811,30 @@ manifest, gets no plan. The removal is one Guardian `Force` transaction of what 
   Start menu state (`Start\TileProperties\W~steam://rungameid/<AppId>`).
 
 When the manifest is gone but Steam still lists the game (Steam then writes the Uninstall entry
-again, without `InstallLocation`), the plan holds Steam's records alone, and `--via-steam` is
+again, without `InstallLocation`), the plan holds Steam's records alone, and handing the removal to Steam is
 refused because Steam cannot uninstall a game whose files are gone.
 
 Steam's own apps (the client, 7, and the screenshot store, 760) are never matched. Before anything is
 removed, the fingerprint (the program names of the install folder, without redistributables, the
-folder, the name and the publisher) is saved like any uninstall's, so `leftovers` and `clean` work
+folder, the name and the publisher) is saved like any uninstall's, so the leftover scan and its clean work
 on the game afterwards. After the removal the same fingerprint drives a leftover scan, in the
-desktop app's review trees and in `niskala uninstall`, which offers the Safe items and lists the rest:
+desktop app's review trees, which check the Safe items and list the rest:
 the game's folders in AppData, LocalLow, ProgramData, `Documents\My Games` and `Saved Games`, its
 Prefetch traces, compatibility and MUI cache records, firewall rules and `SOFTWARE` keys. The
 Steam Cloud copies in `userdata\<account>\<AppId>` (every local account) are never part of the
 removal: the scan lists them for review.
 
-While Steam runs, the files are not touched. The desktop app offers, and the CLI takes:
+While Steam runs, the files are not touched. The desktop app offers two ways on:
 
-- `--close-steam`: `steam.exe -shutdown`, wait up to 60 s for Steam to exit, then remove directly;
-- `--via-steam`: open `steam://uninstall/<AppId>` and let Steam remove the game, for example to sync
-  Steam Cloud first; the leftover scan can run once Steam has finished.
+- **Close Steam**: `steam.exe -shutdown`, wait up to 60 s for Steam to exit, then remove directly;
+- **Uninstall through Steam**: open `steam://uninstall/<AppId>` and let Steam remove the game, for
+  example to sync Steam Cloud first; the leftover scan can run once Steam has finished.
 
-Steam is started with the desktop shell's unelevated token. `uninstall` without either flag stops
-with exit code 2 while Steam runs.
+Steam is started with the desktop shell's unelevated token.
 
 ## Batch Remove
 
-`niskala uninstall` with several applications, or Batch Remove in the desktop app, plans every
+Batch Remove plans every
 application first and lists what cannot run (no uninstall command, a blocking preflight check, a
 Steam game while Steam is running). After one confirmation the queue runs in order, each app with
 its own uninstaller, package removal or direct Steam removal, without leaving the flow; only the
@@ -883,9 +852,9 @@ The Guardian makes every removal a journaled transaction in
 item, `registry.json.gz`, a gzip JSON backup with every value's type and bytes exactly as
 stored, and `registry.reg`, the same backup in Registry Editor format (UTF-16, version 5.00) for use
 without Niskala. Strings and DWORDs that fit the plain notation are written as text; every other
-value is written as `hex(type):` so an import restores the bytes exactly. Unlike `restore`, an
+value is written as `hex(type):` so an import restores the bytes exactly. Unlike a restore, an
 import overwrites values that exist again; a value whose name holds a line break exists only in
-the JSON backup. `clean` and `force` run in this order:
+the JSON backup. A leftover clean and Force Remove run in this order:
 
 1. record the intent: every item as `Pending`;
 2. create a restore point through WMI (`root\default:SystemRestore.CreateRestorePoint`) when
@@ -932,12 +901,12 @@ empty folders, firewall rules and scheduled tasks, registered again from their X
 principal they had (`RegisterTaskDefinition`, missing task folders created). A task whose path is
 taken again stays as it is, and one that kept a stored password cannot come back. Permanently
 deleted files cannot come back; the restore point can.
-`uninstall` also writes a transaction: the restore point plus a backup of the Uninstall entry, App
+An uninstall also writes a transaction: the restore point plus a backup of the Uninstall entry, App
 Paths, service keys and autostart values in the fingerprint.
 
 ## Force Remove and the Target Picker
 
-`force` removes an application without running its uninstaller: an inventory entry, a bare install
+Force Remove takes an application away without running its uninstaller: an inventory entry, a bare install
 folder (named after the folder, its parent as publisher unless that is a known root), a program or
 shortcut of it, or the window, desktop icon or tray icon under a screen point. It ends processes whose image lies in the app's folders (the image is read
 again through the handle that terminates, so a reused process id is never hit, and a process
@@ -986,7 +955,7 @@ and its Steam game, or to a `file://` path; any other file stands for itself.
 
 ## Install Tracker
 
-`track` needs elevation: the kernel providers can only be traced from an elevated session. It starts
+Recording an install needs elevation: the kernel providers can only be traced from an elevated session. It starts
 a real-time ETW session (`Microsoft-Windows-Kernel-Process`, `-Kernel-File` and `-Kernel-Registry`) in
 `Niskala.EtwHelper.dll`, waits until the first buffer arrives, then starts the installer suspended
 inside a job object, tracks it and resumes it.
@@ -1023,14 +992,14 @@ processes, files, keys, values (data after the install and, when known, before),
 the filtered counts, trace statistics (events lost, unresolved names) and notes. The Uninstall entry
 the install created links the log to the inventory entry.
 
-`logs rollback` undoes a log as one `Rollback` transaction through the same Guardian path as `clean`:
+A rollback undoes a log as one `Rollback` transaction through the same Guardian path as a leftover clean:
 the outermost created folders, files, keys and values are removed, and values the install changed or
 deleted are written back to their earlier data, each only while it still holds what the install
 left. A revert-only value is written back only from and to `REG_SZ` or `REG_EXPAND_SZ` data, keeps
 the type it had before the install, and is never removed: one the install created is listed as kept.
 Explorer and running programs are told the environment changed (`WM_SETTINGCHANGE`). Changed files,
-deleted files and values whose earlier data was not captured are listed as not undoable. `uninstall` of an app with a log runs its uninstaller first, then offers the rollback of
-what is left. `restore` undoes the rollback like any transaction; values written back stay.
+deleted files and values whose earlier data was not captured are listed as not undoable. Uninstalling an app with a log runs its uninstaller first, then offers the rollback of
+what is left. A restore undoes the rollback like any transaction; values written back stay.
 
 ## Safety layer
 
@@ -1075,7 +1044,7 @@ symbolic links.
 Diagnostic logs are JSON lines in `%LocalAppData%\Niskala\logs` (`*.jsonl`, next to the `*.nsklog`
 install logs). Event ids are grouped by module: Core
 1xxx, Scanner 2xxx, Uninstall 3xxx, Guardian 4xxx, Tracker 5xxx, Repair 6xxx, Cleaner 7xxx, UI 8xxx,
-CLI 9xxx, Optimizer 10xxx, Updater 11xxx.
+Optimizer 10xxx, Updater 11xxx.
 
 ## License
 

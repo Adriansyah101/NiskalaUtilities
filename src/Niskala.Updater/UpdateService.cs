@@ -5,6 +5,8 @@ namespace Niskala.Updater;
 
 public sealed class UpdateService : IDisposable
 {
+    public const string LibraryFolder = "lib";
+
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(30);
 
     private readonly HttpClient _http;
@@ -13,16 +15,13 @@ public sealed class UpdateService : IDisposable
     private readonly UpdateLauncher _launcher;
     private readonly ILogger<UpdateService> _logger;
 
-    public UpdateService(UpdateProduct product, InstallInfo install, ILogger<UpdateService> logger)
-        : this(product, install, UpdateHttp.Create(CurrentVersion), SystemUpdateShell.Instance, logger)
+    public UpdateService(ILogger<UpdateService> logger)
+        : this(UpdateHttp.Create(CurrentVersion), SystemUpdateShell.Instance, logger)
     {
     }
 
-    public UpdateService(UpdateProduct product, InstallInfo install, HttpClient http, IUpdateShell shell, ILogger<UpdateService> logger)
+    public UpdateService(HttpClient http, IUpdateShell shell, ILogger<UpdateService> logger)
     {
-        ArgumentNullException.ThrowIfNull(install);
-        Product = product;
-        Install = install;
         _http = http;
         _logger = logger;
         _releases = new GitHubReleaseClient(http, CurrentVersion, ReleaseNames.Runtime);
@@ -33,11 +32,14 @@ public sealed class UpdateService : IDisposable
     public static ReleaseVersion CurrentVersion { get; } = ReleaseVersion.Parse(
         typeof(UpdateService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0.0.0");
 
-    public UpdateProduct Product { get; }
+    public static string InstallRoot { get; } = RootOf(AppContext.BaseDirectory);
 
-    public InstallInfo Install { get; }
-
-    public static InstallInfo DetectInstall() => new InstallModeDetector(RegistryInstallLocations.Instance).Detect(AppContext.BaseDirectory);
+    public static string RootOf(string baseDirectory)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(baseDirectory);
+        string here = Path.TrimEndingDirectorySeparator(Path.GetFullPath(baseDirectory));
+        return Path.GetFileName(here).Equals(LibraryFolder, StringComparison.OrdinalIgnoreCase) ? Path.GetDirectoryName(here) ?? here : here;
+    }
 
     public async Task<UpdateCheck> CheckAsync(CancellationToken cancellationToken)
     {
@@ -60,16 +62,16 @@ public sealed class UpdateService : IDisposable
         }
     }
 
-    public ReleaseAsset? PackageFor(UpdateCheck check)
+    public static ReleaseAsset? PackageFor(UpdateCheck check)
     {
         ArgumentNullException.ThrowIfNull(check);
-        return check.Assets.For(Install.Mode, Product);
+        return check.Assets.Installer;
     }
 
     public async Task<VerifiedDownload> DownloadAsync(UpdateCheck check, IProgress<DownloadProgress>? progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(check);
-        ReleaseAsset package = PackageFor(check) ?? throw new UpdateIntegrityException($"Release {check.Latest} has no package for this {Install.Mode.ToString().ToLowerInvariant()} copy.");
+        ReleaseAsset package = PackageFor(check) ?? throw new UpdateIntegrityException($"Release {check.Latest} has no installer for {ReleaseNames.Runtime}.");
         ReleaseAsset checksums = check.Assets.Checksums ?? throw new UpdateIntegrityException($"Release {check.Latest} has no {ReleaseNames.Checksums}.");
         string folder = ReleaseDownloader.CreateFolder();
         try
@@ -92,8 +94,8 @@ public sealed class UpdateService : IDisposable
 
     public UpdateLaunch Apply(VerifiedDownload download, bool restart)
     {
-        UpdateLaunch launch = _launcher.Launch(download, Install.Mode, restart);
-        UpdateLog.Applied(_logger, launch.Action, download.Asset.Name);
+        UpdateLaunch launch = _launcher.Launch(download, restart);
+        UpdateLog.Applied(_logger, download.Asset.Name);
         return launch;
     }
 
@@ -123,6 +125,6 @@ internal static partial class UpdateLog
     [LoggerMessage(EventId = 11004, Level = LogLevel.Error, Message = "{Package} rejected: {Reason}")]
     public static partial void Rejected(ILogger logger, string package, string reason);
 
-    [LoggerMessage(EventId = 11005, Level = LogLevel.Information, Message = "Update applied: {Action} for {Package}")]
-    public static partial void Applied(ILogger logger, UpdateAction action, string package);
+    [LoggerMessage(EventId = 11005, Level = LogLevel.Information, Message = "Update installer started: {Package}")]
+    public static partial void Applied(ILogger logger, string package);
 }

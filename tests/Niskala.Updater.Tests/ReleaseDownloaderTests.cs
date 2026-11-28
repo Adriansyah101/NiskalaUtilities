@@ -56,7 +56,7 @@ public sealed class ReleaseDownloaderTests
     public async Task A_package_missing_from_the_checksums_is_never_downloaded()
     {
         string folder = TestRoots.NewFolder();
-        FakeHandler handler = Serve(Package, $"{Releases.Hash(Package)}  NiskalaUtilities-CLI-v0.2.0-win-x64.zip\n");
+        FakeHandler handler = Serve(Package, $"{Releases.Hash(Package)}  NiskalaUtilities-Setup-v0.2.0-win-arm64.exe\n");
 
         await Assert.ThrowsAsync<UpdateIntegrityException>(() => DownloadAsync(handler, folder));
 

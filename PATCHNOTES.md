@@ -2,6 +2,28 @@
 
 Changes in each release of Niskala Utilities, newest first.
 
+## v0.3.0 (2026-11-27)
+
+### Added
+
+- **Drive Optimizer.** A new page, first under **Maintenance** and in `Ctrl+K` (search for defrag, TRIM, SSD or HDD), lists every fixed drive with its label, an **HDD** or **SSD** badge, the file system, capacity and free space, how fragmented it is and the action it gets.
+- Hard disks and solid-state drives are told apart automatically, including hard disks in USB enclosures that hide it, which are recognised by their spindle speed; the drive line shows the bus and the speed, for example `HDD · NTFS · USB · 4,800 rpm`. A hard disk is **defragmented**; a solid-state drive gets **Optimize (TRIM)** and its clusters are never moved, whatever its enclosure reports. An external USB hard disk can usually be analyzed and defragmented without running as administrator.
+- Three modes for hard disks: **Quick Defrag** joins fragmented files into free space that fits them; **Consolidate Free Space** also fills the gaps left by small files so free space ends up in large blocks; **Full Zone Optimization** puts programs and libraries on the fast outer tracks, everyday files in the middle and large archives, disc images and videos on the inner tracks.
+- **Live cluster map.** A grid of blocks shows free space, contiguous files, fragmented files, the archive zone and system or locked areas, fills in while the drive is analyzed and changes as files are moved. Its colours and legend work in the light and dark theme. Analyzing reads only file system information, keeps its progress bar moving through folders full of small files, steps aside while you use the disk and stops at once when you cancel.
+- **Fragmented files** lists the most fragmented files with their fragment count, size and target zone; **Defrag checked** joins only the files you tick. **Drive health & summary** shows the clusters, free space, fragmented files, excess fragments, the largest free block and the files per speed zone.
+- Defragmenting runs at background priority, moves files in small steps and pauses while you use the disk, so the PC stays responsive. The page file, the hibernation and swap files, the file system's own metadata and every `System Volume Information` folder are left alone, and files in use are skipped without stopping the run. Free space that another program takes while the run goes on is noticed, and the file is moved somewhere else instead of being reported as locked.
+
+### Changed
+
+- **Maintenance is shorter.** It now holds **Drive Optimizer**, **System Repair** and **History & backups**. Storage Map, Duplicate Scan and Secure Wipe are gone; a page from an older version that is no longer there opens **Apps**.
+- **One package.** Niskala Utilities ships only as its installer, with `SHA256SUMS.txt`. The portable archive and the command-line tool are no longer built, and updates download and verify only the installer. An update removes the command-line folder and its `PATH` entry left by an earlier version.
+- **Any screen, any scaling.** The window opens at a size that fits the monitor's work area, from 1366 × 768 up to ultrawide and from 100% to 250% scaling. The sidebar packs its items tighter on short windows and folds to icons on narrow ones, the title bar shortens its search box and drops its badges before they overlap, and the pages share their width in proportion instead of fixed columns. The splash is sized for the monitor it opens on.
+
+### Fixed
+
+- The theme and language buttons at the bottom of the sidebar now show the theme and language in use (**Dark theme**, **Light theme**, **English**, **Bahasa Indonesia**, **Tema gelap**, **Tema terang**) with a switch icon, and their tooltips say what a click changes, in the open and the folded sidebar.
+- Switching between the light and dark theme repaints every page, including pages opened earlier, the window buttons, the cluster map and the dimmed layer behind dialogs.
+
 ## v0.2.0 (2026-11-27)
 
 ### Changed

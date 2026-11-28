@@ -6,8 +6,6 @@ namespace Niskala.Interop.Shell;
 
 public static class KnownFolders
 {
-    public static Guid Downloads { get; } = new("374DE290-123F-4565-9164-39C4925E467B");
-
     public static unsafe string? Find(Guid folder)
     {
         PWSTR path = default;

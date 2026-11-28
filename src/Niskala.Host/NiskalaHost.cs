@@ -14,6 +14,7 @@ using Niskala.Guardian.Restore;
 using Niskala.Guardian.RestorePoints;
 using Niskala.Guardian.Settings;
 using Niskala.Guardian.Startup;
+using Niskala.Optimizer.Drives;
 using Niskala.Optimizer.Processes;
 using Niskala.Optimizer.Resources;
 using Niskala.Repair;
@@ -25,8 +26,6 @@ using Niskala.Scanner.Inventory.Msi;
 using Niskala.Scanner.Leftovers;
 using Niskala.Scanner.Sizing;
 using Niskala.Scanner.Steam;
-using Niskala.Toolkit.Duplicates;
-using Niskala.Toolkit.Wipe;
 using Niskala.Tracker;
 using Niskala.Tracker.Filtering;
 using Niskala.Tracker.Launching;
@@ -245,15 +244,11 @@ public sealed class NiskalaHost : IDisposable
         new RestraintStore(RestraintStore.DefaultFile),
         Logger<ProcessRestrainer>());
 
-    public DuplicateFinder CreateDuplicateFinder() => new(_guard.Value);
-
-    public DuplicateCleaner CreateDuplicateCleaner() => new(CreateLeftoverCleaner());
-
-    public SecureWiper CreateSecureWiper() => new(_guard.Value);
+    public static DriveOptimizer CreateDriveOptimizer() => new(SystemVolumes.Instance);
 
     public static SizeQueue CreateSizeQueue() => SizeQueue.Create(new DiskKindProbe());
 
-    public UpdateService CreateUpdateService(UpdateProduct product) => new(product, UpdateService.DetectInstall(), Logger<UpdateService>());
+    public UpdateService CreateUpdateService() => new(Logger<UpdateService>());
 
     public void Dispose() => LoggerFactory.Dispose();
 

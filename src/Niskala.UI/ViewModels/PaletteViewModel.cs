@@ -5,7 +5,15 @@ using Niskala.Uninstall.Force;
 
 namespace Niskala.UI.ViewModels;
 
-public sealed record PaletteEntry(string Glyph, string Title, string Subtitle, Action Run);
+public sealed record PaletteEntry(string Glyph, string Title, string Subtitle, Action Run)
+{
+    public IReadOnlyList<string> Keywords { get; init; } = [];
+
+    public bool Matches(string query) =>
+        query.Length == 0
+        || Title.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+        || Keywords.Any(k => k.Contains(query, StringComparison.CurrentCultureIgnoreCase) || query.Contains(k, StringComparison.CurrentCultureIgnoreCase));
+}
 
 public sealed partial class PaletteViewModel : ObservableObject
 {
@@ -68,7 +76,7 @@ public sealed partial class PaletteViewModel : ObservableObject
     {
         string query = Query.Trim();
         Results.Clear();
-        foreach (PaletteEntry entry in Commands().Where(c => query.Length == 0 || c.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase)))
+        foreach (PaletteEntry entry in Commands().Where(c => c.Matches(query)))
         {
             Results.Add(entry);
         }
@@ -92,7 +100,7 @@ public sealed partial class PaletteViewModel : ObservableObject
         SelectedIndex = Results.Count > 0 ? 0 : -1;
     }
 
-    private IEnumerable<PaletteEntry> Commands()
+    public IEnumerable<PaletteEntry> Commands()
     {
         yield return new PaletteEntry("", S.NavPicker, S.PalettePickerHint, () => _services.Picker.StartCommand.Execute(null));
         yield return new PaletteEntry("", S.PaletteForceFolder, S.PaletteForceFolderHint, ForceFolder);
@@ -104,7 +112,7 @@ public sealed partial class PaletteViewModel : ObservableObject
         yield return new PaletteEntry("", S.PaletteRecord, S.PaletteRecordHint, _services.Tracker.BrowseAndShow);
         yield return new PaletteEntry("\uE945", S.PaletteQuickScan, S.PaletteQuickScanHint, () => _services.Navigate(Section.QuickScan));
         yield return new PaletteEntry("", S.PaletteStartup, S.PaletteStartupHint, () => _services.Navigate(Section.Resources));
-        yield return new PaletteEntry("\uEDA2", S.PaletteStorage, S.PaletteStorageHint, () => _services.Navigate(Section.Storage));
+        yield return new PaletteEntry("\uEDA2", S.PaletteDrives, S.PaletteDrivesHint, () => _services.Navigate(Section.Drives)) { Keywords = Strings.DriveKeywords };
         yield return new PaletteEntry("", S.PaletteRepair, S.PaletteRepairHint, () => _services.Navigate(Section.Repair));
         yield return new PaletteEntry("\uE895", S.PaletteUpdates, S.PaletteUpdatesHint, () =>
         {

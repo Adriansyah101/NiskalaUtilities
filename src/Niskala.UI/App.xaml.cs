@@ -14,7 +14,13 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
-        Settings = UiSettings.Load();
+        UiSettings loaded = UiSettings.Load();
+        Settings = loaded.Sanitized();
+        if (Settings != loaded)
+        {
+            Settings.Save(NullLogger.Instance);
+        }
+
         Strings.Use(Settings.Indonesian);
         UnhandledException += OnUnhandledException;
     }
@@ -32,6 +38,8 @@ public partial class App : Application
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         _services = new UiServices(DispatcherQueue.GetForCurrentThread());
+        _services.Navigation.Select(UiSettings.StartPage(Settings.Page));
+        _services.Navigation.Shown += section => Update(Settings with { Page = UiSettings.PageId(section) });
         _window = new MainWindow(this, _services);
         _window.Closed += (_, _) => _services.Dispose();
         await _window.ShowWhenRenderedAsync();

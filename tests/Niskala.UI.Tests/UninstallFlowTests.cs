@@ -118,13 +118,13 @@ public sealed class UninstallFlowTests
             return allow;
         };
 
-        Assert.False(nav.Select(Section.Storage));
+        Assert.False(nav.Select(Section.Drives));
         Assert.Equal(Section.Apps, nav.Selected);
 
         allow = true;
-        Assert.True(nav.Select(Section.Storage));
-        Assert.Equal(Section.Storage, nav.Selected);
-        Assert.Equal([Section.Storage, Section.Storage], asked);
+        Assert.True(nav.Select(Section.Drives));
+        Assert.Equal(Section.Drives, nav.Selected);
+        Assert.Equal([Section.Drives, Section.Drives], asked);
     }
 
     [Fact]

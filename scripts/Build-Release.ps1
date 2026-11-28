@@ -20,7 +20,6 @@ $patchNotes = Join-Path $repo 'PATCHNOTES.md'
 $certificateStaging = Join-Path $staging 'publisher'
 $publisherCertificate = Join-Path $certificateStaging 'niskala-pub.cer'
 $installerScript = Join-Path $repo 'installer\NiskalaUtilities.iss'
-$archiver = Join-Path $PSScriptRoot 'New-ReleaseArchive.cs'
 $props = [xml](Get-Content -Raw (Join-Path $repo 'Directory.Build.props'))
 $version = $props.SelectSingleNode('/Project/PropertyGroup/Version').InnerText
 $languages = $props.SelectSingleNode('/Project/PropertyGroup/SatelliteResourceLanguages').InnerText -split ';'
@@ -28,8 +27,7 @@ $platform = @{ 'win-x64' = 'x64'; 'win-arm64' = 'ARM64' }[$Runtime]
 
 $product = 'Niskala Utilities'
 Add-Type -Namespace Niskala -Name Shell -MemberDefinition '[DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern uint ExtractIconExW(string file, int index, IntPtr[] large, IntPtr[] small, uint count);'
-$cli = [pscustomobject]@{ Project = 'src\Niskala.CLI'; Name = "NiskalaUtilities-CLI-v$version-$Runtime"; Root = 'niskala.exe'; Files = 'niskala.exe', 'Niskala.EtwHelper.dll'; Description = "$product CLI" }
-$app = [pscustomobject]@{ Project = 'src\Niskala.UI'; Name = "NiskalaUtilities-v$version-$Runtime"; Root = $null; Files = 'Niskala.exe', 'Niskala.EtwHelper.dll'; Description = $product }
+$app = [pscustomobject]@{ Project = 'src\Niskala.UI'; Name = "NiskalaUtilities-v$version-$Runtime"; Files = 'Niskala.exe', 'Niskala.EtwHelper.dll'; Description = $product }
 $launcherProject = Join-Path $repo 'native\Niskala.Launcher\Niskala.Launcher.vcxproj'
 $launcher = Join-Path $repo "native\Niskala.Launcher\bin\$platform\Release\Niskala.exe"
 
@@ -134,11 +132,15 @@ function Copy-Rules {
 }
 
 function Test-Rules {
-    param([string]$Cli)
+    param([string]$Folder)
 
-    & $Cli clean rules --json | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "$(Split-Path -Leaf $Cli) could not load its rules from lib\rules (exit code $LASTEXITCODE)."
+    foreach ($file in Get-ChildItem -LiteralPath $Folder -File -Filter '*.json') {
+        try {
+            Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json | Out-Null
+        }
+        catch {
+            throw "$($file.Name) in lib\rules is not valid JSON: $($_.Exception.Message)"
+        }
     }
 }
 
@@ -193,9 +195,9 @@ function Find-InnoCompiler {
 function New-Layout {
     param($Payload, [string]$Published, [string]$RootExecutable)
 
-    $output = Join-Path $release $Payload.Name
+    $output = Join-Path $staging 'layout'
     $library = New-Item -ItemType Directory -Force (Join-Path $output 'lib')
-    Get-ChildItem -LiteralPath $Published -Force | Where-Object Name -ne $Payload.Root | Move-Item -Destination $library
+    Get-ChildItem -LiteralPath $Published -Force | Move-Item -Destination $library
     Copy-Item -LiteralPath $RootExecutable -Destination $output
     Copy-Rules (Join-Path $library 'rules')
     Copy-Item -LiteralPath $license -Destination $library
@@ -258,34 +260,26 @@ finally {
 $launcherSymbols = New-Item -ItemType Directory -Force (Join-Path $symbols 'Niskala.Launcher')
 Copy-Item -LiteralPath ([IO.Path]::ChangeExtension($launcher, '.pdb')) -Destination $launcherSymbols
 
-$cliPublished = Publish-Payload $cli
 $appPublished = Publish-Payload $app
 Test-Product (Join-Path $appPublished 'Niskala.exe') $app.Description
-$payloads = @(
-    New-Layout $cli $cliPublished (Join-Path $cliPublished $cli.Root)
-    New-Layout $app $appPublished $launcher
-)
-Clear-Folder $staging
-Test-Rules (Join-Path $payloads[0] $cli.Root)
+$layout = New-Layout $app $appPublished $launcher
+Clear-Folder $appPublished
+Test-Rules (Join-Path $layout 'lib\rules')
 
 $signing = $null
 if ($SignLocal) {
     $signing = & (Join-Path $PSScriptRoot 'Sign-Release.ps1') -CertificatePath $publisherCertificate -Path @(
-        Join-Path $payloads[1] 'Niskala.exe'
-        Join-Path $payloads[1] 'lib\Niskala.exe'
-        Join-Path $payloads[1] 'lib\Niskala.EtwHelper.dll'
-        Join-Path $payloads[0] $cli.Root
-        Join-Path $payloads[0] 'lib\Niskala.EtwHelper.dll'
+        Join-Path $layout 'Niskala.exe'
+        Join-Path $layout 'lib\Niskala.exe'
+        Join-Path $layout 'lib\Niskala.EtwHelper.dll'
     )
 }
 
 $terms = @($env:USERNAME, $env:COMPUTERNAME, $env:USERPROFILE, $repo) |
     Where-Object { $_ -and $_.Length -ge 3 } |
     Sort-Object -Unique
-$leaks = foreach ($payload in $payloads) {
-    Find-PrivateText -Root $payload -Terms $terms |
-        ForEach-Object { "$(Split-Path -Leaf $payload)\$($_.File) (term of $($_.Term.Length) characters)" }
-}
+$leaks = Find-PrivateText -Root $layout -Terms $terms |
+    ForEach-Object { "$($_.File) (term of $($_.Term.Length) characters)" }
 if ($leaks) {
     throw "Local traces in the release:`n$($leaks -join "`n")"
 }
@@ -295,63 +289,52 @@ if ($signing -and (Find-PrivateText -Root $signing.Certificate -Terms $terms)) {
     throw "Local traces in $(Split-Path -Leaf $signing.Certificate)."
 }
 
-$packages = @()
 $iscc = Find-InnoCompiler
+if (-not $iscc) {
+    Clear-Folder $staging
+    throw 'Inno Setup (ISCC.exe) was not found, so no installer was built. Install it with "winget install --id JRSoftware.InnoSetup -e" (or from jrsoftware.org) and run this script again.'
+}
+
+$installer = Join-Path $release "NiskalaUtilities-Setup-v$version-$Runtime.exe"
 try {
-    if ($iscc) {
-        $installer = Join-Path $release "NiskalaUtilities-Setup-v$version-$Runtime.exe"
-        $isccArguments = @('/Q', "/DAppVersion=$version", "/DRuntime=$Runtime", "/DAppSource=$($payloads[1])", "/DCliSource=$($payloads[0])", "/DOutputDir=$release")
-        if ($signing) {
-            $isccArguments += '/DSignInstaller'
-            $isccArguments += "/DPublisherCertificate=$($signing.Certificate)"
-            $isccArguments += "/DPublisherThumbprint=$($signing.Thumbprint)"
-            $isccArguments += ('/Sniskala=$q{0}$q sign /fd SHA256 /sha1 {1} /s My /d $q{2}$q /du {3} $f' -f $signing.SignTool, $signing.Thumbprint, $signing.Description, $signing.ProjectUrl)
-        }
-
-        Invoke-Native $iscc ($isccArguments + $installerScript)
-        if (-not (Test-Path -LiteralPath $installer)) {
-            throw "ISCC.exe finished without writing $installer."
-        }
-
-        Test-Product $installer "$product Setup"
-        if ($signing -and (Get-AuthenticodeSignature -LiteralPath $installer).Status -ne 'Valid') {
-            throw "$installer is not validly signed."
-        }
-
-        $leaks = Find-PrivateText -Root $installer -Terms $terms
-        if ($leaks) {
-            throw "Local traces in $(Split-Path -Leaf $installer)."
-        }
-
-        $packages += $installer
+    New-Item -ItemType Directory -Force $release | Out-Null
+    $isccArguments = @('/Q', "/DAppVersion=$version", "/DRuntime=$Runtime", "/DAppSource=$layout", "/DOutputDir=$release")
+    if ($signing) {
+        $isccArguments += '/DSignInstaller'
+        $isccArguments += "/DPublisherCertificate=$($signing.Certificate)"
+        $isccArguments += "/DPublisherThumbprint=$($signing.Thumbprint)"
+        $isccArguments += ('/Sniskala=$q{0}$q sign /fd SHA256 /sha1 {1} /s My /d $q{2}$q /du {3} $f' -f $signing.SignTool, $signing.Thumbprint, $signing.Description, $signing.ProjectUrl)
     }
-    else {
-        Write-Warning 'Inno Setup (ISCC.exe) was not found, so no installer was built. Install it with "winget install --id JRSoftware.InnoSetup -e" (or from jrsoftware.org) and run this script again.'
+
+    Invoke-Native $iscc ($isccArguments + $installerScript)
+    if (-not (Test-Path -LiteralPath $installer)) {
+        throw "ISCC.exe finished without writing $installer."
+    }
+
+    Test-Product $installer "$product Setup"
+    if ($signing -and (Get-AuthenticodeSignature -LiteralPath $installer).Status -ne 'Valid') {
+        throw "$installer is not validly signed."
+    }
+
+    $leaks = Find-PrivateText -Root $installer -Terms $terms
+    if ($leaks) {
+        throw "Local traces in $(Split-Path -Leaf $installer)."
     }
 }
 finally {
     Clear-Folder $certificateStaging
-    if ((Test-Path -LiteralPath $staging) -and -not (Get-ChildItem -LiteralPath $staging -Force)) {
-        Remove-Item -LiteralPath $staging -Force
-    }
+    Clear-Folder $staging
 }
 
 if (Test-Path -LiteralPath $certificateStaging) {
     throw "$certificateStaging was not removed after the installer was built."
 }
 
-$zips = $payloads | ForEach-Object { "$_.zip" }
-$archiveArguments = for ($i = 0; $i -lt $payloads.Count; $i++) { $payloads[$i]; $zips[$i] }
-Invoke-Native 'dotnet' (@('run', '--file', $archiver, '--') + $archiveArguments)
-$packages += $zips
+$sum = '{0}  {1}' -f (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path -Leaf $installer)
+[IO.File]::WriteAllText((Join-Path $release 'SHA256SUMS.txt'), "$sum`n", (New-Object Text.UTF8Encoding $false))
 
-$sums = foreach ($package in $packages) {
-    '{0}  {1}' -f (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path -Leaf $package)
-}
-[IO.File]::WriteAllText((Join-Path $release 'SHA256SUMS.txt'), (($sums -join "`n") + "`n"), (New-Object Text.UTF8Encoding $false))
-
-$expected = @($packages | ForEach-Object { Split-Path -Leaf $_ }) + 'SHA256SUMS.txt'
-$extra = @(Get-ChildItem -LiteralPath $release -File | Where-Object { $expected -notcontains $_.Name })
+$expected = @((Split-Path -Leaf $installer), 'SHA256SUMS.txt')
+$extra = @(Get-ChildItem -LiteralPath $release -Force | Where-Object { $expected -notcontains $_.Name })
 if ($extra) {
     throw "$release holds files that are not release assets: $($extra.Name -join ', ')."
 }

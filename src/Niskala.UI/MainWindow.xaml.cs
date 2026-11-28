@@ -4,6 +4,7 @@ using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
@@ -20,11 +21,6 @@ namespace Niskala.UI;
 
 public sealed partial class MainWindow : Window
 {
-    private const int StartWidth = 1320;
-    private const int StartHeight = 860;
-    private const int MinimumWidth = 960;
-    private const int MinimumHeight = 640;
-
     private static readonly TimeSpan PromptRetry = TimeSpan.FromMilliseconds(750);
     private static readonly TimeSpan ScrimFade = TimeSpan.FromMilliseconds(160);
 
@@ -47,10 +43,11 @@ public sealed partial class MainWindow : Window
         _handle = handle;
         Pickers.Owner = handle;
         double scale = WindowNative.Scale(handle);
-        _presenter.PreferredMinimumWidth = (int)(MinimumWidth * scale);
-        _presenter.PreferredMinimumHeight = (int)(MinimumHeight * scale);
+        PixelRect work = WorkArea();
+        ApplyMinimum(work, scale);
         AppWindow.SetPresenter(_presenter);
-        AppWindow.Resize(new SizeInt32((int)(StartWidth * scale), (int)(StartHeight * scale)));
+        PixelRect start = WindowPlacement.Initial(work, scale);
+        AppWindow.MoveAndResize(new RectInt32(start.X, start.Y, start.Width, start.Height));
         nint icon = WindowChrome.ApplicationIcon();
         if (icon != 0)
         {
@@ -79,7 +76,12 @@ public sealed partial class MainWindow : Window
         };
 
         Launcher.SizeChanged += (_, _) => UpdatePassthrough();
-        Root.SizeChanged += (_, _) => UpdatePassthrough();
+        Root.SizeChanged += (_, _) =>
+        {
+            FitTitleBar();
+            UpdatePassthrough();
+        };
+        Root.Loaded += (_, _) => Root.XamlRoot.Changed += (_, _) => ApplyMinimum(WorkArea(), WindowNative.Scale(_handle));
         services.ThemeToggleRequested += ToggleTheme;
         services.LanguageToggleRequested += ToggleLanguage;
         _promptTimer = DispatcherQueue.CreateTimer();
@@ -107,13 +109,12 @@ public sealed partial class MainWindow : Window
     private static string Version { get; } =
         typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? string.Empty;
 
-    private static bool IsElevated
+    private static bool IsElevated { get; } = Elevated();
+
+    private static bool Elevated()
     {
-        get
-        {
-            using WindowsIdentity identity = WindowsIdentity.GetCurrent();
-            return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
-        }
+        using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
     }
 
     private void Rebuild()
@@ -122,8 +123,9 @@ public sealed partial class MainWindow : Window
         AppName.Text = s.AppTitle;
         VersionText.Text = Version;
         AdminText.Text = s.Administrator;
-        AdminPill.Visibility = IsElevated ? Visibility.Visible : Visibility.Collapsed;
+        FitTitleBar();
         LauncherText.Text = s.PaletteLauncher;
+        AutomationProperties.SetName(Launcher, s.PaletteLauncher);
         Host.Child = new ShellView(_services);
     }
 
@@ -158,6 +160,27 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnLauncherClick(object sender, RoutedEventArgs e) => _services.Palette.Open();
+
+    private PixelRect WorkArea()
+    {
+        RectInt32 area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        return new PixelRect(area.X, area.Y, area.Width, area.Height);
+    }
+
+    private void ApplyMinimum(PixelRect work, double scale)
+    {
+        (int width, int height) = WindowPlacement.Minimum(work, scale);
+        _presenter.PreferredMinimumWidth = width;
+        _presenter.PreferredMinimumHeight = height;
+    }
+
+    private void FitTitleBar()
+    {
+        TitleBarFit fit = WindowPlacement.FitTitleBar(Root.ActualWidth, CaptionColumn.Width.Value);
+        Launcher.Width = fit.LauncherWidth;
+        VersionText.Visibility = fit.ShowVersion ? Visibility.Visible : Visibility.Collapsed;
+        AdminPill.Visibility = IsElevated && fit.ShowAdmin ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     private async void TryPrompt()
     {
@@ -234,7 +257,7 @@ public sealed partial class MainWindow : Window
 
     private void ToggleLanguage()
     {
-        _app.Update(_app.Settings with { Language = _app.Settings.Indonesian ? "en" : "id" });
+        _app.Update(_app.Settings with { Language = _app.Settings.Indonesian ? UiSettings.EnglishCode : UiSettings.IndonesianCode });
         Strings.Use(_app.Settings.Indonesian);
         _services.Relabel();
         Rebuild();
@@ -244,6 +267,7 @@ public sealed partial class MainWindow : Window
     {
         Root.RequestedTheme = _app.Theme;
         bool light = _app.Theme == ElementTheme.Light;
+        _services.Navigation.IsLightTheme = light;
         AppWindowTitleBar bar = AppWindow.TitleBar;
         bar.ButtonBackgroundColor = Colors.Transparent;
         bar.ButtonInactiveBackgroundColor = Colors.Transparent;

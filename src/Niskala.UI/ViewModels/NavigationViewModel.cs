@@ -13,8 +13,11 @@ public enum NavGroup
 
 public sealed partial class NavPage : ObservableObject
 {
-    internal NavPage(Section section, string glyph, NavCategory? category)
+    private readonly NavigationViewModel _owner;
+
+    internal NavPage(NavigationViewModel owner, Section section, string glyph, NavCategory? category)
     {
+        _owner = owner;
         Section = section;
         Glyph = glyph;
         Category = category;
@@ -31,6 +34,10 @@ public sealed partial class NavPage : ObservableObject
 
     [ObservableProperty]
     public partial bool IsSelected { get; set; }
+
+    public double ButtonHeight => Category is null ? _owner.CategoryButtonHeight : _owner.PageButtonHeight;
+
+    internal void DensityChanged() => OnPropertyChanged(nameof(ButtonHeight));
 }
 
 public sealed partial class NavCategory : ObservableObject
@@ -72,6 +79,17 @@ public sealed partial class NavCategory : ObservableObject
 
     public string Chevron => IsExpanded ? ExpandedChevron : CollapsedChevron;
 
+    public double ButtonHeight => _owner.CategoryButtonHeight;
+
+    internal void DensityChanged()
+    {
+        OnPropertyChanged(nameof(ButtonHeight));
+        foreach (NavPage page in Pages)
+        {
+            page.DensityChanged();
+        }
+    }
+
     internal void PaneChanged()
     {
         OnPropertyChanged(nameof(ShowPages));
@@ -84,14 +102,29 @@ public sealed partial class NavigationViewModel : ObservableObject
 {
     public const double OpenPaneWidth = 272;
     public const double CompactPaneWidth = 56;
+    public const double DenseBelowHeight = 760;
+    public const double CompactBelowWidth = 1000;
+    public const double ReopenFromWidth = 1040;
+    public const double CategoryHeight = 36;
+    public const double DenseCategoryHeight = 32;
+    public const double PageHeight = 34;
+    public const double DensePageHeight = 30;
+    public const double PaneGap = 6;
+    public const double DensePaneGap = 2;
+    public const string DarkGlyph = "";
+    public const string LightGlyph = "";
+    public const string LanguageGlyph = "";
+    public const string SwitchGlyph = "";
+
+    private bool _autoCompact;
 
     public NavigationViewModel()
     {
         Add(NavGroup.Apps, "", (Section.Apps, ""), (Section.Tracker, ""), (Section.Picker, ""));
         Add(NavGroup.Cleaning, "", (Section.QuickScan, ""), (Section.SelectiveClean, ""), (Section.Registry, ""));
         Add(NavGroup.Performance, "", (Section.Resources, ""), (Section.Suspend, ""));
-        Add(NavGroup.Maintenance, "", (Section.Storage, ""), (Section.Duplicates, ""), (Section.Wipe, ""), (Section.Repair, ""), (Section.History, ""));
-        Updates = new NavPage(Section.Updates, "", null);
+        Add(NavGroup.Maintenance, "", (Section.Drives, ""), (Section.Repair, ""), (Section.History, ""));
+        Updates = new NavPage(this, Section.Updates, "", null);
         Relabel(Strings.Current);
         Mark(Page(Section.Apps));
     }
@@ -120,6 +153,30 @@ public sealed partial class NavigationViewModel : ObservableObject
     public bool IsCompact => !IsPaneOpen;
 
     public double PaneWidth => IsPaneOpen ? OpenPaneWidth : CompactPaneWidth;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CategoryButtonHeight), nameof(PageButtonHeight), nameof(PaneSpacing))]
+    public partial bool IsDense { get; private set; }
+
+    public double PaneSpacing => IsDense ? DensePaneGap : PaneGap;
+
+    public double CategoryButtonHeight => IsDense ? DenseCategoryHeight : CategoryHeight;
+
+    public double PageButtonHeight => IsDense ? DensePageHeight : PageHeight;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ThemeLabel), nameof(ThemeHint), nameof(ThemeGlyph))]
+    public partial bool IsLightTheme { get; set; }
+
+    public string ThemeLabel => Strings.Current.ThemeName(IsLightTheme);
+
+    public string ThemeHint => Strings.Current.SwitchThemeHint(IsLightTheme);
+
+    public string ThemeGlyph => IsLightTheme ? LightGlyph : DarkGlyph;
+
+    public string LanguageLabel => Strings.Current.LanguageName;
+
+    public string LanguageHint => Strings.Current.SwitchLanguageHint;
 
     public IEnumerable<NavPage> Pages => Categories.SelectMany(c => c.Pages).Append(Updates);
 
@@ -150,7 +207,35 @@ public sealed partial class NavigationViewModel : ObservableObject
 
     public void Toggle(NavCategory category) => category.IsExpanded = !category.IsExpanded;
 
-    public void TogglePane() => IsPaneOpen = !IsPaneOpen;
+    public void TogglePane()
+    {
+        _autoCompact = false;
+        IsPaneOpen = !IsPaneOpen;
+    }
+
+    public void Fit(double width, double height)
+    {
+        if (height > 0)
+        {
+            IsDense = height < DenseBelowHeight;
+        }
+
+        if (width <= 0)
+        {
+            return;
+        }
+
+        if (width < CompactBelowWidth && IsPaneOpen)
+        {
+            _autoCompact = true;
+            IsPaneOpen = false;
+        }
+        else if (width >= ReopenFromWidth && _autoCompact)
+        {
+            _autoCompact = false;
+            IsPaneOpen = true;
+        }
+    }
 
     public void Relabel(Strings strings)
     {
@@ -169,6 +254,21 @@ public sealed partial class NavigationViewModel : ObservableObject
         {
             page.Title = strings.NavTitle(page.Section);
         }
+
+        OnPropertyChanged(nameof(ThemeLabel));
+        OnPropertyChanged(nameof(ThemeHint));
+        OnPropertyChanged(nameof(LanguageLabel));
+        OnPropertyChanged(nameof(LanguageHint));
+    }
+
+    partial void OnIsDenseChanged(bool value)
+    {
+        foreach (NavCategory category in Categories)
+        {
+            category.DensityChanged();
+        }
+
+        Updates.DensityChanged();
     }
 
     partial void OnIsPaneOpenChanged(bool value)
@@ -184,7 +284,7 @@ public sealed partial class NavigationViewModel : ObservableObject
         var category = new NavCategory(this, group, glyph);
         foreach ((Section section, string pageGlyph) in pages)
         {
-            category.Pages.Add(new NavPage(section, pageGlyph, category));
+            category.Pages.Add(new NavPage(this, section, pageGlyph, category));
         }
 
         Categories.Add(category);

@@ -7,10 +7,7 @@
 #define Root AddBackslash(SourcePath) + "..\"
 #define CertificateFile "niskala-pub.cer"
 #ifndef AppSource
-#define AppSource Root + "artifacts\release\NiskalaUtilities-v" + AppVersion + "-" + Runtime
-#endif
-#ifndef CliSource
-#define CliSource Root + "artifacts\release\NiskalaUtilities-CLI-v" + AppVersion + "-" + Runtime
+#error Pass the staged app folder with /DAppSource=...; scripts\Build-Release.ps1 does.
 #endif
 #ifndef OutputDir
 #define OutputDir Root + "artifacts\release"
@@ -69,22 +66,16 @@ SignTool=niskala
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-[Components]
-Name: "app"; Description: "Niskala Utilities"; Types: full compact custom; Flags: fixed
-Name: "cli"; Description: "niskala command-line tool"; Types: full custom
-
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "addtopath"; Description: "Add the niskala command to PATH"; GroupDescription: "Command line:"; Components: cli; Flags: unchecked
 
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\lib"
-Type: filesandordirs; Name: "{app}\cli\lib"
+Type: filesandordirs; Name: "{app}\cli"
 Type: files; Name: "{app}\{#CertificateFile}"
 
 [Files]
-Source: "{#AppSource}\*"; DestDir: "{app}"; Components: app; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#CliSource}\*"; DestDir: "{app}\cli"; Components: cli; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#AppSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #ifdef PublisherCertificate
 Source: "{#PublisherCertificate}"; DestDir: "{tmp}"; DestName: "{#CertificateFile}"; Flags: ignoreversion deleteafterinstall
 #endif
@@ -92,9 +83,6 @@ Source: "{#PublisherCertificate}"; DestDir: "{tmp}"; DestName: "{#CertificateFil
 [Icons]
 Name: "{autoprograms}\Niskala Utilities"; Filename: "{app}\Niskala.exe"
 Name: "{autodesktop}\Niskala Utilities"; Filename: "{app}\Niskala.exe"; Tasks: desktopicon
-
-[Registry]
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\cli"; Tasks: addtopath; Check: NeedsPathEntry(ExpandConstant('{app}\cli'))
 
 [Run]
 #ifdef PublisherCertificate
@@ -151,16 +139,6 @@ begin
   Result := WizardSilent and (Pos('/RESTARTAPPLICATIONS', Uppercase(GetCmdTail)) > 0);
 end;
 
-function NeedsPathEntry(Folder: string): Boolean;
-var
-  Paths: string;
-begin
-  if not RegQueryStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths) then
-    Result := True
-  else
-    Result := Pos(';' + Uppercase(Folder) + ';', ';' + Uppercase(Paths) + ';') = 0;
-end;
-
 procedure RemovePathEntry;
 var
   Paths, Entry: string;
@@ -175,6 +153,12 @@ begin
     Exit;
   Delete(Paths, Index, Length(Entry) - 1);
   RegWriteExpandStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Copy(Paths, 2, Length(Paths) - 2));
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    RemovePathEntry;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

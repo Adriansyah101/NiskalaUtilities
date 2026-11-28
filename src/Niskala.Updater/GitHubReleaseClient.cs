@@ -13,10 +13,6 @@ public static class ReleaseNames
     public static string Runtime { get; } = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "win-arm64" : "win-x64";
 
     public static string Installer(ReleaseVersion version, string runtime) => $"{Product}-Setup-v{version}-{runtime}.exe";
-
-    public static string Portable(ReleaseVersion version, string runtime) => $"{Product}-v{version}-{runtime}.zip";
-
-    public static string Cli(ReleaseVersion version, string runtime) => $"{Product}-CLI-v{version}-{runtime}.zip";
 }
 
 public static class UpdateHttp
@@ -72,11 +68,7 @@ public sealed class GitHubReleaseClient(HttpClient http, ReleaseVersion current,
         }
 
         List<GitHubAsset> assets = release.Assets ?? [];
-        var found = new ReleaseAssets(
-            Find(assets, ReleaseNames.Installer(latest, runtime)),
-            Find(assets, ReleaseNames.Portable(latest, runtime)),
-            Find(assets, ReleaseNames.Cli(latest, runtime)),
-            Find(assets, ReleaseNames.Checksums));
+        var found = new ReleaseAssets(Find(assets, ReleaseNames.Installer(latest, runtime)), Find(assets, ReleaseNames.Checksums));
 
         return new UpdateCheck(
             latest > current ? UpdateStatus.Available : UpdateStatus.UpToDate,

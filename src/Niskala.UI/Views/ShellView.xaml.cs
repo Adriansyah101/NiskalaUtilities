@@ -13,6 +13,8 @@ namespace Niskala.UI.Views;
 public sealed partial class ShellView : UserControl
 {
     private const double PaletteTop = 56;
+    private const double PaletteWidth = 600;
+    private const double PaletteMargin = 16;
 
     private readonly UiServices _services;
     private readonly Dictionary<Section, UIElement> _pages = [];
@@ -22,16 +24,15 @@ public sealed partial class ShellView : UserControl
     {
         _services = services;
         InitializeComponent();
-        LabelThemeButton();
         Pane.Width = Nav.PaneWidth;
         Nav.Shown += Show;
         Nav.PropertyChanged += OnNavChanged;
-        services.ThemeToggleRequested += LabelThemeButton;
+        SizeChanged += OnSizeChanged;
         Unloaded += (_, _) =>
         {
             Nav.Shown -= Show;
             Nav.PropertyChanged -= OnNavChanged;
-            services.ThemeToggleRequested -= LabelThemeButton;
+            SizeChanged -= OnSizeChanged;
         };
         Show(Nav.Selected);
     }
@@ -44,6 +45,10 @@ public sealed partial class ShellView : UserControl
 
     public UpdatesViewModel Updates => _services.Updates;
 
+    public static double PaletteWidthFor(double available) => Math.Max(0, Math.Min(PaletteWidth, available - (2 * PaletteMargin)));
+
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e) => Nav.Fit(e.NewSize.Width, e.NewSize.Height);
+
     private void OnPaneToggleClick(object sender, RoutedEventArgs e) => Nav.TogglePane();
 
     private void OnNavChanged(object? sender, PropertyChangedEventArgs e)
@@ -51,6 +56,10 @@ public sealed partial class ShellView : UserControl
         if (e.PropertyName == nameof(NavigationViewModel.PaneWidth))
         {
             ResizePane();
+        }
+        else if (e.PropertyName == nameof(NavigationViewModel.IsLightTheme))
+        {
+            ForgetHiddenPages();
         }
     }
 
@@ -127,7 +136,13 @@ public sealed partial class ShellView : UserControl
 
     private void OnLanguageClick(object sender, RoutedEventArgs e) => _services.ToggleLanguage();
 
-    private void LabelThemeButton() => ThemeButton.Label = Application.Current is App { Theme: ElementTheme.Light } ? S.ThemeDark : S.ThemeLight;
+    private void ForgetHiddenPages()
+    {
+        foreach (Section hidden in _pages.Keys.Where(s => s != Nav.Selected).ToArray())
+        {
+            _pages.Remove(hidden);
+        }
+    }
 
     private void Show(Section section)
     {
@@ -142,9 +157,7 @@ public sealed partial class ShellView : UserControl
                 Section.Registry => new RegistryIntegrityPage(_services.Integrity),
                 Section.Resources => new ResourceControlPage(_services.Resources),
                 Section.Suspend => new ProcessSuspendPage(_services.Suspend),
-                Section.Storage => new StorageMapPage(_services.Storage),
-                Section.Duplicates => new DuplicateScanPage(_services.Duplicates),
-                Section.Wipe => new SecureWipePage(_services.Wipe),
+                Section.Drives => new DriveOptimizerPage(_services.Drives),
                 Section.Repair => new RepairPage(_services.Repair),
                 Section.History => new HistoryPage(_services.History),
                 Section.Updates => new UpdatesPage(_services.Updates),
@@ -171,6 +184,9 @@ public sealed partial class ShellView : UserControl
             case Section.Suspend when !_services.Suspend.IsLoaded:
                 _ = _services.Suspend.RefreshAsync();
                 break;
+            case Section.Drives:
+                _services.Drives.EnsureLoaded();
+                break;
             case Section.History:
                 _services.History.EnsureLoaded();
                 break;
@@ -179,6 +195,7 @@ public sealed partial class ShellView : UserControl
 
     private void OnPaletteOpened(object? sender, object e)
     {
+        PaletteCard.Width = PaletteWidthFor(ActualWidth);
         PalettePopup.HorizontalOffset = Math.Max(0, (ActualWidth - PaletteCard.Width) / 2);
         PalettePopup.VerticalOffset = PaletteTop;
         PaletteBox.Focus(FocusState.Programmatic);

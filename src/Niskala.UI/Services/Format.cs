@@ -32,6 +32,8 @@ internal static class Format
 
     public static string Number(long value) => value.ToString("N0", Culture);
 
+    public static string Percent(double value) => string.Create(Culture, $"{Math.Round(value, 1):0.#}%");
+
     public static Visibility Visible(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
 
     public static Visibility Collapsed(bool value) => value ? Visibility.Collapsed : Visibility.Visible;

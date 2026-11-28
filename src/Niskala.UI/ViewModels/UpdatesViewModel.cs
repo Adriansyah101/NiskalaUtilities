@@ -19,7 +19,7 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
     internal UpdatesViewModel(UiServices services)
     {
         _services = services;
-        _updater = new Lazy<UpdateService>(() => services.Host.CreateUpdateService(UpdateProduct.Desktop));
+        _updater = new Lazy<UpdateService>(services.Host.CreateUpdateService);
         ShowNotes();
     }
 
@@ -35,9 +35,9 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
 
     public string CurrentVersion => UpdateService.CurrentVersion.ToString();
 
-    public string Copy => _updater.Value.Install.IsInstalled ? S.UpdateInstalledCopy(_updater.Value.Install.Root) : S.UpdatePortableCopy(_updater.Value.Install.Root);
+    public string Copy => S.UpdateInstalledCopy(UpdateService.InstallRoot);
 
-    public string ApplyLabel => _updater.Value.Install.IsInstalled ? S.UpdateRestart : S.UpdateSavePackage;
+    public string ApplyLabel => S.UpdateRestart;
 
     public bool AutoCheck
     {
@@ -166,14 +166,8 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
         {
             VerifiedDownload download = await _updater.Value.DownloadAsync(check, new Sink(this), cancel.Token);
             Progress = S.UpdateVerified(download.Asset.Name);
-            UpdateLaunch launch = _updater.Value.Apply(download, restart: true);
-            if (launch.Action == UpdateAction.InstallerStarted)
-            {
-                Application.Current.Exit();
-                return;
-            }
-
-            Result = S.UpdateSaved(launch.Path, _updater.Value.Install.Root);
+            _updater.Value.Apply(download, restart: true);
+            Application.Current.Exit();
         }
         catch (OperationCanceledException)
         {
@@ -214,7 +208,7 @@ public sealed partial class UpdatesViewModel : ObservableObject, IDisposable
         {
             UpdateCheck check = await _updater.Value.CheckAsync(CancellationToken.None);
             _check = check;
-            IsAvailable = check.IsAvailable && _updater.Value.PackageFor(check) is not null && check.Assets.Checksums is not null;
+            IsAvailable = check.IsAvailable && check.Assets.IsComplete;
             Latest = check.Latest?.ToString() ?? "—";
             Page = check.Page?.AbsoluteUri ?? string.Empty;
             ShowNotes();

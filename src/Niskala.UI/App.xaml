@@ -38,6 +38,11 @@
           <SolidColorBrush x:Key="NiskalaNavOpenBrush" Color="#10FFFFFF" />
           <SolidColorBrush x:Key="NiskalaNavGuideBrush" Color="#343846" />
           <SolidColorBrush x:Key="NiskalaScrimBrush" Color="#A6000000" />
+          <SolidColorBrush x:Key="NiskalaMapFreeBrush" Color="#23262E" />
+          <SolidColorBrush x:Key="NiskalaMapUsedBrush" Color="#5B86E5" />
+          <SolidColorBrush x:Key="NiskalaMapFragmentedBrush" Color="#EF6A63" />
+          <SolidColorBrush x:Key="NiskalaMapArchiveBrush" Color="#A889EC" />
+          <SolidColorBrush x:Key="NiskalaMapSystemBrush" Color="#7C8190" />
           <SolidColorBrush x:Key="ContentDialogBackground" Color="#121317" />
           <SolidColorBrush x:Key="ContentDialogTopOverlay" Color="#191B21" />
           <SolidColorBrush x:Key="ContentDialogBorderBrush" Color="#25272F" />
@@ -85,6 +90,11 @@
           <SolidColorBrush x:Key="NiskalaNavOpenBrush" Color="#0B000000" />
           <SolidColorBrush x:Key="NiskalaNavGuideBrush" Color="#C9CDD8" />
           <SolidColorBrush x:Key="NiskalaScrimBrush" Color="#590B192C" />
+          <SolidColorBrush x:Key="NiskalaMapFreeBrush" Color="#DFE2E9" />
+          <SolidColorBrush x:Key="NiskalaMapUsedBrush" Color="#3E63D4" />
+          <SolidColorBrush x:Key="NiskalaMapFragmentedBrush" Color="#CF3439" />
+          <SolidColorBrush x:Key="NiskalaMapArchiveBrush" Color="#7650C8" />
+          <SolidColorBrush x:Key="NiskalaMapSystemBrush" Color="#6F7484" />
           <SolidColorBrush x:Key="ContentDialogBackground" Color="#F5F6F8" />
           <SolidColorBrush x:Key="ContentDialogTopOverlay" Color="#FFFFFF" />
           <SolidColorBrush x:Key="ContentDialogBorderBrush" Color="#E2E4EA" />

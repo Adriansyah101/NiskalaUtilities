@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:services="using:Niskala.UI.Services">
-  <StackPanel Width="440" Spacing="14">
+  <StackPanel MaxWidth="440" Spacing="14">
     <TextBlock Text="{x:Bind S.UpdatePromptIntro}" Style="{StaticResource MutedTextStyle}" />
 
     <Grid ColumnSpacing="10">
